@@ -1,0 +1,29 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  nix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+      - uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-server-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-server-
+          save: ${{ github.event_name == 'push' }}
+          gc-max-store-size-linux: 4G
+      - run: nix develop --accept-flake-config --command ./scripts/check-config.sh
+      - run: nix build --accept-flake-config --no-link .#checks.x86_64-linux.example .#checks.x86_64-linux.biliup
