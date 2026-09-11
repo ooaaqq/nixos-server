@@ -138,6 +138,13 @@ in
         pkgs.deno
         pkgs.ffmpeg-headless
       ];
+      preStart = ''
+        parser_cache=/var/cache/qq-bot/nonebot2/nonebot_plugin_parser
+        if [ -d "$parser_cache" ]; then
+          ${pkgs.findutils}/bin/find "$parser_cache" -type d -exec ${pkgs.coreutils}/bin/chmod 0755 {} +
+          ${pkgs.findutils}/bin/find "$parser_cache" -type f -exec ${pkgs.coreutils}/bin/chmod 0644 {} +
+        fi
+      '';
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
