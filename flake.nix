@@ -47,10 +47,14 @@
       nixosModules = moduleFiles;
       nixosConfigurations.example = example;
 
-      packages.${system}.biliup = pkgs.callPackage ./packages/biliup.nix { };
+      packages.${system} = {
+        biliup = pkgs.callPackage ./packages/biliup.nix { };
+        playwright-browsers-1_62 = pkgs.callPackage ./packages/playwright-browsers-1.62.nix { };
+      };
       checks.${system} = {
         example = example.config.system.build.toplevel;
         biliup = pkgs.callPackage ./packages/biliup.nix { };
+        playwright-browsers-1_62 = pkgs.callPackage ./packages/playwright-browsers-1.62.nix { };
       };
 
       devShells.${system}.default = pkgs.mkShellNoCC {
