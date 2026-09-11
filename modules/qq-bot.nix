@@ -44,6 +44,11 @@ in
       default = null;
       description = "NoneBot project containing pyproject.toml, uv.lock, and bot.py";
     };
+    environment = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = "Additional environment variables for the NoneBot service";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -68,6 +73,9 @@ in
         "snowluma-data:/app/data"
         "snowluma-qq-config:/app/.config"
         "snowluma-qq-data:/app/.local/share"
+      ]
+      ++ lib.optionals hasNoneBot [
+        "/var/cache/qq-bot:/var/cache/qq-bot:ro"
       ];
       extraOptions = [
         "--cap-add=SYS_PTRACE"
@@ -84,6 +92,10 @@ in
       group = "qq-bot";
     };
 
+    systemd.tmpfiles.rules = lib.optionals hasNoneBot [
+      "d /var/cache/qq-bot 0755 qq-bot qq-bot -"
+    ];
+
     systemd.services.qq-bot = lib.mkIf hasNoneBot {
       description = "NoneBot QQ bot";
       wantedBy = [ "multi-user.target" ];
@@ -97,12 +109,26 @@ in
       ];
       environment = {
         DRIVER = "~httpx+~websockets";
+        LD_LIBRARY_PATH = lib.makeLibraryPath [
+          pkgs.expat
+          pkgs.stdenv.cc.cc.lib
+          pkgs.zlib
+        ];
+        LOCALSTORE_CACHE_DIR = "/var/cache/qq-bot/nonebot2";
+        LOCALSTORE_CONFIG_DIR = "/var/lib/qq-bot/config";
+        LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/data";
         ONEBOT_V11_WS_URLS = ''["ws://127.0.0.1:${toString cfg.onebotWsPort}"]'';
+        PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
         UV_CACHE_DIR = "/var/cache/qq-bot/uv";
         UV_NO_MANAGED_PYTHON = "1";
         UV_PROJECT_ENVIRONMENT = "/var/lib/qq-bot/venv";
-        UV_PYTHON = "${pkgs.python313}/bin/python3";
-      };
+        UV_PYTHON = "${pkgs.python314}/bin/python3";
+      }
+      // cfg.environment;
+      path = [
+        pkgs.deno
+        pkgs.ffmpeg-headless
+      ];
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
