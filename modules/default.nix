@@ -10,5 +10,6 @@
     ./ss2022.nix
     ./sub2api.nix
     ./web.nix
+    ./qq-bot.nix
   ];
 }

@@ -28,6 +28,7 @@
         ss2022 = ./modules/ss2022.nix;
         sub2api = ./modules/sub2api.nix;
         web = ./modules/web.nix;
+        qq-bot = ./modules/qq-bot.nix;
       };
       example = nixpkgs.lib.nixosSystem {
         inherit system;
