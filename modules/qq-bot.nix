@@ -7,6 +7,7 @@
 let
   cfg = config.ssvgg.qqBot;
   hasNoneBot = cfg.nonebotProject != null;
+  playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
   packagedNoneBotProject =
     if hasNoneBot then
       pkgs.runCommandLocal "qq-bot-project" { } ''
@@ -94,6 +95,12 @@ in
 
     systemd.tmpfiles.rules = lib.optionals hasNoneBot [
       "d /var/cache/qq-bot 0755 qq-bot qq-bot -"
+      "d /var/lib/qq-bot/bilibili 0700 qq-bot qq-bot -"
+      "z /var/lib/qq-bot/bilibili/subscription.sqlite3 0600 qq-bot qq-bot -"
+      "z /var/lib/qq-bot/bilibili/subscription.sqlite3-* 0600 qq-bot qq-bot -"
+      "d /var/lib/qq-bot/config 0700 qq-bot qq-bot -"
+      "d /var/lib/qq-bot/config/nonebot_plugin_parser 0700 qq-bot qq-bot -"
+      "z /var/lib/qq-bot/config/nonebot_plugin_parser/bilibili_cookies.json 0600 qq-bot qq-bot -"
     ];
 
     systemd.services.qq-bot = lib.mkIf hasNoneBot {
@@ -109,6 +116,7 @@ in
       ];
       environment = {
         DRIVER = "~httpx+~websockets";
+        FONTCONFIG_FILE = playwrightBrowsers.fontconfigFile;
         LD_LIBRARY_PATH = lib.makeLibraryPath [
           pkgs.expat
           pkgs.stdenv.cc.cc.lib
@@ -119,6 +127,7 @@ in
         LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/data";
         ONEBOT_V11_WS_URLS = ''["ws://127.0.0.1:${toString cfg.onebotWsPort}"]'';
         PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
+        PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsers;
         UV_CACHE_DIR = "/var/cache/qq-bot/uv";
         UV_NO_MANAGED_PYTHON = "1";
         UV_PROJECT_ENVIRONMENT = "/var/lib/qq-bot/venv";
@@ -133,7 +142,9 @@ in
         User = "qq-bot";
         Group = "qq-bot";
         StateDirectory = "qq-bot";
+        StateDirectoryMode = "0700";
         CacheDirectory = "qq-bot";
+        UMask = "0077";
         WorkingDirectory = packagedNoneBotProject;
         ExecStart = "${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${packagedNoneBotProject}/bot.py";
         Restart = "on-failure";
