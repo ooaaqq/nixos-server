@@ -47,7 +47,7 @@
               };
             };
             config = lib.mkIf config.ssvgg.i915Sriov.enable {
-              boot.extraModulePackages = [ pkgs.i915-sriov ];
+              boot.extraModulePackages = [ config.boot.kernelPackages.i915-sriov ];
               boot.kernelModules = [ "i915" ];
               boot.kernelParams = [
                 "intel_iommu=on"
