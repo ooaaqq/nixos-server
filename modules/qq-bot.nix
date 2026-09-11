@@ -7,6 +7,14 @@
 let
   cfg = config.ssvgg.qqBot;
   hasNoneBot = cfg.nonebotProject != null;
+  packagedNoneBotProject =
+    if hasNoneBot then
+      pkgs.runCommandLocal "qq-bot-project" { } ''
+        mkdir -p "$out"
+        cp -r ${cfg.nonebotProject}/. "$out/"
+      ''
+    else
+      null;
 in
 {
   options.ssvgg.qqBot = {
@@ -100,8 +108,8 @@ in
         Group = "qq-bot";
         StateDirectory = "qq-bot";
         CacheDirectory = "qq-bot";
-        WorkingDirectory = cfg.nonebotProject;
-        ExecStart = "${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${cfg.nonebotProject}/bot.py";
+        WorkingDirectory = packagedNoneBotProject;
+        ExecStart = "${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${packagedNoneBotProject}/bot.py";
         Restart = "on-failure";
         RestartSec = "5s";
       };
