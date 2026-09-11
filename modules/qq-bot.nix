@@ -7,7 +7,7 @@ in
     enable = lib.mkEnableOption "LLBot QQ bot";
     image = lib.mkOption {
       type = lib.types.str;
-      default = "linyuchen/llbot:v8.1.10";
+      default = "docker.io/linyuchen/llbot:8.1.10";
     };
     dataDir = lib.mkOption {
       type = lib.types.path;
