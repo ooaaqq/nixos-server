@@ -144,7 +144,8 @@ in
         StateDirectory = "qq-bot";
         StateDirectoryMode = "0700";
         CacheDirectory = "qq-bot";
-        UMask = "0077";
+        # Parser media is shared read-only with the SnowLuma container.
+        UMask = "0022";
         WorkingDirectory = packagedNoneBotProject;
         ExecStart = "${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${packagedNoneBotProject}/bot.py";
         Restart = "on-failure";
