@@ -13,8 +13,6 @@ let
 
     config_path=${lib.escapeShellArg llbotConfigPath}
     ${pkgs.coreutils}/bin/install -d -m 0700 -o llonebot -g llonebot "$(dirname "$config_path")"
-    # Preserve settings saved through the application WebUI.
-    if [ -e "$config_path" ]; then exit 0; fi
     token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
     temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
     trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
@@ -29,6 +27,7 @@ let
       --arg token "$token" \
       --argjson webuiPort ${toString cfg.webuiPort} \
       --argjson milkyPort ${toString cfg.milkyPort} \
+      --argjson onebotWsPort ${toString cfg.onebotWsPort} \
       ' .webui = (.webui // {})
         | .webui.enable = true
         | .webui.host = "0.0.0.0"
@@ -41,7 +40,36 @@ let
         | .milky.http.port = $milkyPort
         | .milky.http.prefix = ""
         | .milky.http.accessToken = $token
-        | .milky.webhook = (.milky.webhook // {urls: [], accessToken: ""})' > "$temporary_path"
+        | .milky.webhook = (.milky.webhook // {urls: [], accessToken: ""})
+        | .ob11 = (.ob11 // {})
+        | .ob11.enable = true
+        | (.ob11.connect | if type == "array" then . else [] end) as $connections
+        | .ob11.connect = ($connections
+            | if any(.[]; .type == "ws") then
+                map(if .type == "ws" then
+                  . + {
+                    enable: true,
+                    host: "127.0.0.1",
+                    port: $onebotWsPort,
+                    token: $token,
+                    messageFormat: "array",
+                    reportSelfMessage: false,
+                    reportOfflineMessage: false
+                  }
+                else . end)
+              else . + [{
+                type: "ws",
+                enable: true,
+                host: "127.0.0.1",
+                port: $onebotWsPort,
+                heartInterval: 60000,
+                token: $token,
+                messageFormat: "array",
+                reportSelfMessage: false,
+                reportOfflineMessage: false,
+                debug: false
+              }]
+              end)' > "$temporary_path"
 
     ${pkgs.coreutils}/bin/chown llonebot:llonebot "$temporary_path"
     ${pkgs.coreutils}/bin/chmod 0600 "$temporary_path"
@@ -88,6 +116,16 @@ in
       type = lib.types.port;
       default = 13000;
     };
+    onebotWsPort = lib.mkOption {
+      type = lib.types.port;
+      default = 3001;
+      description = "OneBot V11 forward WebSocket server port.";
+    };
+    sharedMediaDirectory = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Host media directory mounted read-only at the same path in LLBot.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -119,7 +157,12 @@ in
       };
       environmentFiles = environmentFiles;
       cmd = [ "--qq=${cfg.qqNumber}" ];
-      volumes = [ "${cfg.dataDirectory}/llbot:/app/llbot/data" ];
+      volumes = [
+        "${cfg.dataDirectory}/llbot:/app/llbot/data"
+      ]
+      ++ lib.optional (
+        cfg.sharedMediaDirectory != null
+      ) "${cfg.sharedMediaDirectory}:${cfg.sharedMediaDirectory}:ro";
       extraOptions = [
         "--network=host"
         "--shm-size=1g"
