@@ -12,6 +12,5 @@
     ./web.nix
     ./qq-bot.nix
     ./llonebot.nix
-    ./karin-bot.nix
   ];
 }
