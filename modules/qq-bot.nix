@@ -26,7 +26,7 @@ let
         cp -r ${cfg.nonebotProject}/. "$out/"
         ${lib.optionalString hasParserLite ''
           mkdir -p "$out/nonebot_plugin_parser_lite"
-          cp -r ${cfg.parserLiteSource}/. "$out/nonebot_plugin_parser_lite/"
+          cp -r ${cfg.parserLiteSource}/src/nonebot_plugin_parser_lite/. "$out/nonebot_plugin_parser_lite/"
         ''}
       ''
     else
@@ -50,6 +50,11 @@ in
       default = null;
       description = "Environment file containing the LLBot Milky access token";
     };
+    runtimeConfigFile = lib.mkOption {
+      type = lib.types.path;
+      default = "/var/lib/qq-bot/config/nonebot.env";
+      description = "Mutable NoneBot runtime configuration managed outside Nix";
+    };
     nonebotProject = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
@@ -59,11 +64,6 @@ in
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = "Source directory for nonebot-plugin-parser-lite";
-    };
-    environment = lib.mkOption {
-      type = lib.types.attrsOf lib.types.str;
-      default = { };
-      description = "Additional environment variables for the NoneBot service";
     };
   };
 
@@ -76,10 +76,14 @@ in
 
     systemd.tmpfiles.rules = lib.optionals hasNoneBot [
       "d /var/cache/qq-bot 0755 qq-bot qq-bot -"
+      "d /var/cache/qq-bot/nonebot2 0755 qq-bot qq-bot -"
       "d /var/lib/qq-bot/bilibili 0700 qq-bot qq-bot -"
       "z /var/lib/qq-bot/bilibili/subscription.sqlite3 0600 qq-bot qq-bot -"
       "z /var/lib/qq-bot/bilibili/subscription.sqlite3-* 0600 qq-bot qq-bot -"
       "d /var/lib/qq-bot/config 0700 qq-bot qq-bot -"
+      "f ${cfg.runtimeConfigFile} 0640 qq-bot qq-bot -"
+      "d /var/lib/qq-bot/data 0700 qq-bot qq-bot -"
+      "d /var/lib/qq-bot/meme-generator 0755 qq-bot qq-bot -"
       "d /var/lib/qq-bot/config/nonebot_plugin_parser 0700 qq-bot qq-bot -"
       "z /var/lib/qq-bot/config/nonebot_plugin_parser/bilibili_cookies.json 0600 qq-bot qq-bot -"
     ];
@@ -103,6 +107,10 @@ in
           pkgs.stdenv.cc.cc.lib
           pkgs.zlib
         ];
+        HOME = "/var/lib/qq-bot";
+        XDG_CONFIG_HOME = "/var/lib/qq-bot/config";
+        XDG_CACHE_HOME = "/var/cache/qq-bot";
+        XDG_DATA_HOME = "/var/lib/qq-bot/data";
         LOCALSTORE_CACHE_DIR = "/var/cache/qq-bot/nonebot2";
         LOCALSTORE_CONFIG_DIR = "/var/lib/qq-bot/config";
         LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/data";
@@ -112,8 +120,7 @@ in
         UV_NO_MANAGED_PYTHON = "1";
         UV_PROJECT_ENVIRONMENT = "/var/lib/qq-bot/venv";
         UV_PYTHON = "${pkgs.python314}/bin/python3";
-      }
-      // cfg.environment;
+      };
       path = [
         pkgs.deno
         pkgs.ffmpeg-headless
@@ -128,7 +135,9 @@ in
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
-        EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
+        EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile ++ [
+          cfg.runtimeConfigFile
+        ];
         StateDirectory = "qq-bot";
         StateDirectoryMode = "0700";
         CacheDirectory = "qq-bot";
