@@ -13,7 +13,8 @@ let
 
     config_path=${lib.escapeShellArg llbotConfigPath}
     ${pkgs.coreutils}/bin/install -d -m 0700 -o llonebot -g llonebot "$(dirname "$config_path")"
-    token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
+    milky_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
+    onebot_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.onebotTokenEnvironmentVariable} || true)"
     temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
     trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
 
@@ -24,7 +25,8 @@ let
     fi
 
     printf '%s\n' "$existing_config" | ${pkgs.jq}/bin/jq \
-      --arg token "$token" \
+      --arg milkyToken "$milky_token" \
+      --arg onebotToken "$onebot_token" \
       --argjson webuiPort ${toString cfg.webuiPort} \
       --argjson milkyPort ${toString cfg.milkyPort} \
       --argjson onebotWsPort ${toString cfg.onebotWsPort} \
@@ -39,7 +41,7 @@ let
         | .milky.http.host = "127.0.0.1"
         | .milky.http.port = $milkyPort
         | .milky.http.prefix = ""
-        | .milky.http.accessToken = $token
+        | .milky.http.accessToken = $milkyToken
         | .milky.webhook = (.milky.webhook // {urls: [], accessToken: ""})
         | .ob11 = (.ob11 // {})
         | .ob11.enable = true
@@ -51,7 +53,7 @@ let
                     enable: true,
                     host: "127.0.0.1",
                     port: $onebotWsPort,
-                    token: $token,
+                    token: $onebotToken,
                     messageFormat: "array",
                     reportSelfMessage: false,
                     reportOfflineMessage: false
@@ -63,7 +65,7 @@ let
                 host: "127.0.0.1",
                 port: $onebotWsPort,
                 heartInterval: 60000,
-                token: $token,
+                token: $onebotToken,
                 messageFormat: "array",
                 reportSelfMessage: false,
                 reportOfflineMessage: false,
@@ -78,7 +80,7 @@ let
 in
 {
   options.ssvgg.llonebot = {
-    enable = lib.mkEnableOption "LLOneBot with PMHQ and Milky";
+    enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, and OneBot V11";
     llbotImage = lib.mkOption {
       type = lib.types.str;
       default = "docker.io/linyuchen/llbot:latest";
@@ -103,6 +105,11 @@ in
       type = lib.types.str;
       default = "ONEBOT_ACCESS_TOKEN";
       description = "Environment variable containing the Milky access token.";
+    };
+    onebotTokenEnvironmentVariable = lib.mkOption {
+      type = lib.types.str;
+      default = "ONEBOT_ACCESS_TOKEN";
+      description = "Environment variable containing the OneBot V11 access token.";
     };
     webuiPort = lib.mkOption {
       type = lib.types.port;
