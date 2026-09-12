@@ -12,6 +12,9 @@ let
   startNoneBot = pkgs.writeShellScript "qq-bot-start" ''
     set -euo pipefail
     token="''${ONEBOT_ACCESS_TOKEN:-}"
+    if [ -z "''${ONEBOT_V11_ACCESS_TOKEN:-}" ]; then
+      export ONEBOT_V11_ACCESS_TOKEN="$token"
+    fi
     export MILKY_CLIENTS="$(${pkgs.jq}/bin/jq -cn \
       --arg host ${lib.escapeShellArg cfg.milkyHost} \
       --argjson port ${toString cfg.milkyPort} \
@@ -44,6 +47,16 @@ in
       type = lib.types.port;
       default = 3010;
       description = "LLBot Milky HTTP and WebSocket port";
+    };
+    onebotWsHost = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "LLBot OneBot V11 forward WebSocket host.";
+    };
+    onebotWsPort = lib.mkOption {
+      type = lib.types.port;
+      default = 3001;
+      description = "LLBot OneBot V11 forward WebSocket port.";
     };
     environmentFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -103,6 +116,7 @@ in
         DRIVER = "~fastapi+~httpx+~websockets";
         HOST = "127.0.0.1";
         PORT = "3011";
+        ONEBOT_V11_WS_URLS = ''["ws://${cfg.onebotWsHost}:${toString cfg.onebotWsPort}"]'';
         FONTCONFIG_FILE = playwrightBrowsers.fontconfigFile;
         LD_LIBRARY_PATH = lib.makeLibraryPath [
           pkgs.expat
