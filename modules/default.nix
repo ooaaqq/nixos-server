@@ -11,6 +11,6 @@
     ./sub2api.nix
     ./web.nix
     ./qq-bot.nix
-    ./karin-bot.nix
+    ./llonebot.nix
   ];
 }
