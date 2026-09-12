@@ -126,6 +126,11 @@ in
         pkgs.ffmpeg-headless
       ];
       preStart = ''
+        runtime_config=${lib.escapeShellArg cfg.runtimeConfigFile}
+        example_config=${lib.escapeShellArg "${cfg.nonebotProject}/nonebot.env.example"}
+        if [ ! -s "$runtime_config" ] && [ -f "$example_config" ]; then
+          ${pkgs.coreutils}/bin/install -o qq-bot -g qq-bot -m 0640 "$example_config" "$runtime_config"
+        fi
         parser_cache=/var/cache/qq-bot/nonebot2/nonebot_plugin_parser
         if [ -d "$parser_cache" ]; then
           ${pkgs.findutils}/bin/find "$parser_cache" -type d -exec ${pkgs.coreutils}/bin/chmod 0755 {} +
