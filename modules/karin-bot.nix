@@ -137,7 +137,7 @@ in
       ];
       serviceConfig.ExecStartPre = pkgs.writeShellScript "seed-karin-project" ''
         data_dir=${lib.escapeShellArg cfg.dataDirectory}
-        install -d -o karin -g karin "$data_dir"
+        install -d -m 0750 -o karin -g karin "$data_dir"
         # Seed once. WebUI/package-manager changes survive service restarts.
         if [ ! -e "$data_dir/package.json" ]; then
           install -m 0644 -o karin -g karin ${cfg.project}/package.json "$data_dir/package.json"
