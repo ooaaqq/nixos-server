@@ -8,6 +8,12 @@ let
   cfg = config.ssvgg.karinBot;
   environmentFiles = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
   milkyConfigPath = "${cfg.dataDirectory}/@karinjs/@karinjs/plugin-adapter-milky/config/config.json";
+  karinFonts = pkgs.makeFontsConf {
+    fontDirectories = [
+      pkgs.noto-fonts-cjk-sans
+      pkgs.noto-fonts-emoji
+    ];
+  };
   prepareKarinMilkyConfig = pkgs.writeShellScript "karin-prepare-milky-config" ''
     set -euo pipefail
 
@@ -99,9 +105,15 @@ in
     virtualisation.oci-containers.containers.karin = {
       image = cfg.image;
       ports = [ "127.0.0.1:${toString cfg.webuiPort}:7777" ];
-      volumes = [ "${cfg.dataDirectory}:/app" ];
+      volumes = [
+        "${cfg.dataDirectory}:/app"
+        "${karinFonts}:/etc/fonts/fonts.conf:ro"
+        "${pkgs.noto-fonts-cjk-sans}/share/fonts:/usr/share/fonts/noto-cjk:ro"
+        "${pkgs.noto-fonts-emoji}/share/fonts:/usr/share/fonts/noto-emoji:ro"
+      ];
       environment = {
         TZ = "Asia/Shanghai";
+        FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
       };
       extraOptions = [
         "--network=host"
