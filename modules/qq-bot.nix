@@ -7,43 +7,58 @@
 let
   cfg = config.ssvgg.qqBot;
   hasNoneBot = cfg.nonebotProject != null;
+  hasParserLite = cfg.parserLiteSource != null;
   playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
+  startNoneBot = pkgs.writeShellScript "qq-bot-start" ''
+    set -euo pipefail
+    token="''${ONEBOT_ACCESS_TOKEN:-}"
+    export MILKY_CLIENTS="$(${pkgs.jq}/bin/jq -cn \
+      --arg host ${lib.escapeShellArg cfg.milkyHost} \
+      --argjson port ${toString cfg.milkyPort} \
+      --arg token "$token" \
+      '[{host: $host, port: $port, access_token: $token, secure: false}]')"
+    exec ${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${packagedNoneBotProject}/bot.py
+  '';
   packagedNoneBotProject =
     if hasNoneBot then
       pkgs.runCommandLocal "qq-bot-project" { } ''
         mkdir -p "$out"
         cp -r ${cfg.nonebotProject}/. "$out/"
+        ${lib.optionalString hasParserLite ''
+          mkdir -p "$out/nonebot_plugin_parser_lite"
+          cp -r ${cfg.parserLiteSource}/. "$out/nonebot_plugin_parser_lite/"
+        ''}
       ''
     else
       null;
 in
 {
   options.ssvgg.qqBot = {
-    enable = lib.mkEnableOption "SnowLuma and NoneBot QQ bot";
-    image = lib.mkOption {
+    enable = lib.mkEnableOption "NoneBot QQ bot connected to LLBot Milky";
+    milkyHost = lib.mkOption {
       type = lib.types.str;
-      default = "docker.io/motricseven7/snowluma:latest";
+      default = "127.0.0.1";
+      description = "LLBot Milky host reachable by NoneBot";
     };
-    webuiPort = lib.mkOption {
+    milkyPort = lib.mkOption {
       type = lib.types.port;
-      default = 5099;
+      default = 3010;
+      description = "LLBot Milky HTTP and WebSocket port";
     };
-    noVncPort = lib.mkOption {
-      type = lib.types.port;
-      default = 6081;
-    };
-    onebotHttpPort = lib.mkOption {
-      type = lib.types.port;
-      default = 3000;
-    };
-    onebotWsPort = lib.mkOption {
-      type = lib.types.port;
-      default = 3001;
+    environmentFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Environment file containing the LLBot Milky access token";
     };
     nonebotProject = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = "NoneBot project containing pyproject.toml, uv.lock, and bot.py";
+    };
+    parserLiteSource = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Source directory for nonebot-plugin-parser-lite";
     };
     environment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
@@ -53,40 +68,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    virtualisation.podman.enable = true;
-    virtualisation.oci-containers.backend = "podman";
-    virtualisation.oci-containers.containers.snowluma = {
-      image = cfg.image;
-      environment = {
-        SNOWLUMA_HOOK_AUTOLOAD = "1";
-        SNOWLUMA_QQ_FLAGS = "--disable-gpu --disable-software-rasterizer --disable-gpu-compositing";
-        SNOWLUMA_WEBUI_HOST = "0.0.0.0";
-        SNOWLUMA_WEBUI_PORT = "5099";
-        TZ = "Asia/Shanghai";
-      };
-      ports = [
-        "127.0.0.1:${toString cfg.noVncPort}:6081"
-        "127.0.0.1:${toString cfg.webuiPort}:5099"
-        "127.0.0.1:${toString cfg.onebotHttpPort}:3000"
-        "127.0.0.1:${toString cfg.onebotWsPort}:3001"
-      ];
-      volumes = [
-        "snowluma-data:/app/data"
-        "snowluma-qq-config:/app/.config"
-        "snowluma-qq-data:/app/.local/share"
-      ]
-      ++ lib.optionals hasNoneBot [
-        "/var/cache/qq-bot:/var/cache/qq-bot:ro"
-      ];
-      extraOptions = [
-        "--cap-add=SYS_PTRACE"
-        "--security-opt=seccomp=unconfined"
-        "--shm-size=1g"
-        "--ulimit=nofile=65536:1048576"
-        "--pull=always"
-      ];
-    };
-
     users.groups.qq-bot = lib.mkIf hasNoneBot { };
     users.users.qq-bot = lib.mkIf hasNoneBot {
       isSystemUser = true;
@@ -108,11 +89,11 @@ in
       wantedBy = [ "multi-user.target" ];
       wants = [
         "network-online.target"
-        "podman-snowluma.service"
+        "podman-llbot.service"
       ];
       after = [
         "network-online.target"
-        "podman-snowluma.service"
+        "podman-llbot.service"
       ];
       environment = {
         DRIVER = "~httpx+~websockets";
@@ -125,7 +106,6 @@ in
         LOCALSTORE_CACHE_DIR = "/var/cache/qq-bot/nonebot2";
         LOCALSTORE_CONFIG_DIR = "/var/lib/qq-bot/config";
         LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/data";
-        ONEBOT_V11_WS_URLS = ''["ws://127.0.0.1:${toString cfg.onebotWsPort}"]'';
         PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
         PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsers;
         UV_CACHE_DIR = "/var/cache/qq-bot/uv";
@@ -148,13 +128,13 @@ in
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
+        EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
         StateDirectory = "qq-bot";
         StateDirectoryMode = "0700";
         CacheDirectory = "qq-bot";
-        # Parser media is shared read-only with the SnowLuma container.
         UMask = "0022";
         WorkingDirectory = packagedNoneBotProject;
-        ExecStart = "${pkgs.uv}/bin/uv run --frozen --no-managed-python python ${packagedNoneBotProject}/bot.py";
+        ExecStart = startNoneBot;
         Restart = "on-failure";
         RestartSec = "5s";
       };
