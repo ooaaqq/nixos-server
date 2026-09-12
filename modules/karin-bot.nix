@@ -116,6 +116,15 @@ in
         "podman-llbot.service"
       ];
       serviceConfig.ExecStartPre = pkgs.writeShellScript "seed-karin-project" ''
+        data_dir=${lib.escapeShellArg cfg.dataDirectory}
+        node_modules="$data_dir/node_modules"
+        for stale in "$node_modules"/.pnpm/@karinjs+plugin-ffmpeg@*; do
+          if [ -e "$stale" ]; then
+            ${pkgs.coreutils}/bin/rm -rf "$node_modules"
+            break
+          fi
+        done
+        ${pkgs.coreutils}/bin/rm -rf "$data_dir/@karinjs/@karinjs-plugin-ffmpeg"
         install -d -o karin -g karin ${cfg.dataDirectory}
         install -o karin -g karin ${cfg.project}/package.json ${cfg.dataDirectory}/package.json
         install -o karin -g karin ${cfg.project}/pnpm-lock.yaml ${cfg.dataDirectory}/pnpm-lock.yaml

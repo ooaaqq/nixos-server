@@ -116,6 +116,7 @@ in
         TZ = "Asia/Shanghai";
       };
       environmentFiles = environmentFiles;
+      cmd = [ "--qq=${cfg.qqNumber}" ];
       volumes = [ "${cfg.dataDirectory}/llbot:/app/llbot/data" ];
       extraOptions = [
         "--network=host"
