@@ -13,6 +13,8 @@ let
 
     config_path=${lib.escapeShellArg llbotConfigPath}
     ${pkgs.coreutils}/bin/install -d -m 0700 -o llonebot -g llonebot "$(dirname "$config_path")"
+    # Preserve settings saved through the application WebUI.
+    if [ -e "$config_path" ]; then exit 0; fi
     token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
     temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
     trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
