@@ -24,7 +24,7 @@ let
 in
 {
   options.ssvgg.qqBot = {
-    enable = lib.mkEnableOption "SnowLuma and NoneBot QQ bot";
+    enable = lib.mkEnableOption "NoneBot QQ bot connected to LLBot Milky";
     image = lib.mkOption {
       type = lib.types.str;
       default = "docker.io/motricseven7/snowluma:latest";
@@ -65,37 +65,6 @@ in
   config = lib.mkIf cfg.enable {
     virtualisation.podman.enable = true;
     virtualisation.oci-containers.backend = "podman";
-    virtualisation.oci-containers.containers.snowluma = {
-      image = cfg.image;
-      environment = {
-        SNOWLUMA_HOOK_AUTOLOAD = "1";
-        SNOWLUMA_QQ_FLAGS = "--disable-gpu --disable-software-rasterizer --disable-gpu-compositing";
-        SNOWLUMA_WEBUI_HOST = "0.0.0.0";
-        SNOWLUMA_WEBUI_PORT = "5099";
-        TZ = "Asia/Shanghai";
-      };
-      ports = [
-        "127.0.0.1:${toString cfg.noVncPort}:6081"
-        "127.0.0.1:${toString cfg.webuiPort}:5099"
-        "127.0.0.1:${toString cfg.onebotHttpPort}:3000"
-        "127.0.0.1:${toString cfg.onebotWsPort}:3001"
-      ];
-      volumes = [
-        "snowluma-data:/app/data"
-        "snowluma-qq-config:/app/.config"
-        "snowluma-qq-data:/app/.local/share"
-      ]
-      ++ lib.optionals hasNoneBot [
-        "/var/cache/qq-bot:/var/cache/qq-bot:ro"
-      ];
-      extraOptions = [
-        "--cap-add=SYS_PTRACE"
-        "--security-opt=seccomp=unconfined"
-        "--shm-size=1g"
-        "--ulimit=nofile=65536:1048576"
-        "--pull=always"
-      ];
-    };
 
     users.groups.qq-bot = lib.mkIf hasNoneBot { };
     users.users.qq-bot = lib.mkIf hasNoneBot {
@@ -118,11 +87,11 @@ in
       wantedBy = [ "multi-user.target" ];
       wants = [
         "network-online.target"
-        "podman-snowluma.service"
+        "podman-llbot.service"
       ];
       after = [
         "network-online.target"
-        "podman-snowluma.service"
+        "podman-llbot.service"
       ];
       environment = {
         DRIVER = "~httpx+~websockets";
@@ -135,7 +104,9 @@ in
         LOCALSTORE_CACHE_DIR = "/var/cache/qq-bot/nonebot2";
         LOCALSTORE_CONFIG_DIR = "/var/lib/qq-bot/config";
         LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/data";
-        ONEBOT_V11_WS_URLS = ''["ws://127.0.0.1:${toString cfg.onebotWsPort}"]'';
+        # LLBot accepts the local Milky connection; authentication is supplied by
+        # the environment file when the deployment enables it.
+        MILKY_CLIENTS = ''[{"host":"127.0.0.1","port":3010,"secure":false}]'';
         PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
         PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsers;
         UV_CACHE_DIR = "/var/cache/qq-bot/uv";
