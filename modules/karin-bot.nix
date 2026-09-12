@@ -13,6 +13,8 @@ let
 
     config_path=${lib.escapeShellArg milkyConfigPath}
     ${pkgs.coreutils}/bin/install -d -m 0750 -o karin -g karin "$(dirname "$config_path")"
+    # Runtime settings belong to the application after first initialization.
+    if [ -e "$config_path" ]; then exit 0; fi
     token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
     temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
     trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
@@ -26,9 +28,7 @@ let
     printf '%s\n' "$existing_config" | ${pkgs.jq}/bin/jq \
       --arg url ${lib.escapeShellArg cfg.milkyUrl} \
       --arg token "$token" \
-      --argjson masters ${lib.escapeShellArg (builtins.toJSON cfg.masterIds)} \
-      ' .master = $masters
-        | .reconnectMaxCount = (.reconnectMaxCount // -1)
+      ' .reconnectMaxCount = (.reconnectMaxCount // -1)
         | .reconnectInterval = (.reconnectInterval // 5)
         | .webhookToken = (.webhookToken // "")
         | .bots = ((.bots // [])
@@ -49,7 +49,7 @@ in
     };
     project = lib.mkOption {
       type = lib.types.path;
-      description = "Seed Karin project containing package.json and pnpm-lock.yaml";
+      description = "First-install seed only; existing application dependencies are managed by Karin";
     };
     environmentFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -73,14 +73,27 @@ in
       type = lib.types.port;
       default = 7777;
     };
-    masterIds = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ "console" ];
-      description = "Karin master user IDs. The console master is retained by default.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
+    environment.systemPackages = [
+      (pkgs.writeShellApplication {
+        name = "karin-manage";
+        runtimeInputs = with pkgs; [
+          coreutils
+          gnutar
+          gzip
+          podman
+          systemd
+          util-linux
+        ];
+        runtimeEnv = {
+          KARIN_DATA = toString cfg.dataDirectory;
+          KARIN_BACKUPS = "/var/backups/karin";
+        };
+        text = builtins.readFile ../scripts/karin-manage.sh;
+      })
+    ];
     virtualisation.podman.enable = true;
     virtualisation.oci-containers.backend = "podman";
     virtualisation.oci-containers.containers.karin = {
@@ -124,17 +137,12 @@ in
       ];
       serviceConfig.ExecStartPre = pkgs.writeShellScript "seed-karin-project" ''
         data_dir=${lib.escapeShellArg cfg.dataDirectory}
-        node_modules="$data_dir/node_modules"
-        for stale in "$node_modules"/.pnpm/@karinjs+plugin-ffmpeg@*; do
-          if [ -e "$stale" ]; then
-            ${pkgs.coreutils}/bin/rm -rf "$node_modules"
-            break
-          fi
-        done
-        ${pkgs.coreutils}/bin/rm -rf "$data_dir/@karinjs/@karinjs-plugin-ffmpeg"
-        install -d -o karin -g karin ${cfg.dataDirectory}
-        install -o karin -g karin ${cfg.project}/package.json ${cfg.dataDirectory}/package.json
-        install -o karin -g karin ${cfg.project}/pnpm-lock.yaml ${cfg.dataDirectory}/pnpm-lock.yaml
+        install -d -o karin -g karin "$data_dir"
+        # Seed once. WebUI/package-manager changes survive service restarts.
+        if [ ! -e "$data_dir/package.json" ]; then
+          install -m 0644 -o karin -g karin ${cfg.project}/package.json "$data_dir/package.json"
+          install -m 0644 -o karin -g karin ${cfg.project}/pnpm-lock.yaml "$data_dir/pnpm-lock.yaml"
+        fi
       '';
     };
   };
