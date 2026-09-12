@@ -7,12 +7,17 @@
 let
   cfg = config.ssvgg.qqBot;
   hasNoneBot = cfg.nonebotProject != null;
+  hasParserLite = cfg.parserLiteSource != null;
   playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
   packagedNoneBotProject =
     if hasNoneBot then
       pkgs.runCommandLocal "qq-bot-project" { } ''
         mkdir -p "$out"
         cp -r ${cfg.nonebotProject}/. "$out/"
+        ${lib.optionalString hasParserLite ''
+          mkdir -p "$out/nonebot_plugin_parser_lite"
+          cp -r ${cfg.parserLiteSource}/. "$out/nonebot_plugin_parser_lite/"
+        ''}
       ''
     else
       null;
@@ -44,6 +49,11 @@ in
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = "NoneBot project containing pyproject.toml, uv.lock, and bot.py";
+    };
+    parserLiteSource = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "Source directory for nonebot-plugin-parser-lite";
     };
     environment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
