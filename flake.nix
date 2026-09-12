@@ -36,6 +36,7 @@
         web = ./modules/web.nix;
         qq-bot = ./modules/qq-bot.nix;
         llonebot = ./modules/llonebot.nix;
+        karin-bot = ./modules/karin-bot.nix;
         i915-sriov =
           { config, ... }:
           {
