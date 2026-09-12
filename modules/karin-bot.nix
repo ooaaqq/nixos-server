@@ -26,7 +26,9 @@ let
     printf '%s\n' "$existing_config" | ${pkgs.jq}/bin/jq \
       --arg url ${lib.escapeShellArg cfg.milkyUrl} \
       --arg token "$token" \
-      ' .reconnectMaxCount = (.reconnectMaxCount // -1)
+      --argjson masters ${lib.escapeShellArg (builtins.toJSON cfg.masterIds)} \
+      ' .master = $masters
+        | .reconnectMaxCount = (.reconnectMaxCount // -1)
         | .reconnectInterval = (.reconnectInterval // 5)
         | .webhookToken = (.webhookToken // "")
         | .bots = ((.bots // [])
@@ -70,6 +72,11 @@ in
     webuiPort = lib.mkOption {
       type = lib.types.port;
       default = 7777;
+    };
+    masterIds = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "console" ];
+      description = "Karin master user IDs. The console master is retained by default.";
     };
   };
 
