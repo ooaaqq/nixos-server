@@ -100,7 +100,9 @@ in
         "podman-llbot.service"
       ];
       environment = {
-        DRIVER = "~httpx+~websockets";
+        DRIVER = "~fastapi+~httpx+~websockets";
+        HOST = "127.0.0.1";
+        PORT = "3011";
         FONTCONFIG_FILE = playwrightBrowsers.fontconfigFile;
         LD_LIBRARY_PATH = lib.makeLibraryPath [
           pkgs.expat
