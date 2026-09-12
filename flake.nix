@@ -35,7 +35,7 @@
         sub2api = ./modules/sub2api.nix;
         web = ./modules/web.nix;
         qq-bot = ./modules/qq-bot.nix;
-        karin-bot = ./modules/karin-bot.nix;
+        llonebot = ./modules/llonebot.nix;
         i915-sriov =
           { config, ... }:
           {
