@@ -231,6 +231,22 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
             self.assertEqual(command[-2:], [str(first), str(second)])
             self.assertEqual(app.state["uploads"], {})
 
+    def test_summary_waits_for_full_reconnect_window_before_finalizing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            clock = [100.0]
+            app = self.make_app(Path(temporary) / "state.json", clock)
+            app.handle_event(event("SessionStarted", "start-1", SessionId="session-1"))
+            clock[0] = 110.0
+            app.handle_event(event("SessionEnded", "end-1", SessionId="session-1"))
+
+            clock[0] += 30.0
+            app.finalize_sessions()
+            self.assertFalse(app.state["sessions"]["session-1"]["summary_queued"])
+
+            app.handle_event(event("SessionStarted", "start-2", SessionId="session-2"))
+            self.assertNotIn("session-1", app.state["sessions"])
+            self.assertIn("session-2", app.state["sessions"])
+
     def test_late_file_closed_for_merged_session_stays_in_the_multi_part_upload(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "recordings"
