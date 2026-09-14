@@ -83,11 +83,11 @@ in
     enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, and OneBot V11";
     llbotImage = lib.mkOption {
       type = lib.types.str;
-      default = "docker.io/linyuchen/llbot:latest";
+      default = "docker.io/linyuchen/llbot:8.2.0";
     };
     pmhqImage = lib.mkOption {
       type = lib.types.str;
-      default = "docker.io/linyuchen/pmhq:latest";
+      default = "docker.io/linyuchen/pmhq:8.1.1";
     };
     qqNumber = lib.mkOption {
       type = lib.types.str;
