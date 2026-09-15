@@ -59,6 +59,7 @@ let
   commonPath = [
     pkgs.deno
     pkgs.ffmpeg-headless
+    pkgs.git
   ];
 
   mainEnvironment = commonEnvironment // {
