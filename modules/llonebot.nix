@@ -15,6 +15,7 @@ let
     ${pkgs.coreutils}/bin/install -d -m 0700 -o llonebot -g llonebot "$(dirname "$config_path")"
     milky_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
     onebot_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.onebotTokenEnvironmentVariable} || true)"
+    satori_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.satoriTokenEnvironmentVariable} || true)"
     temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
     trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
 
@@ -27,8 +28,10 @@ let
     printf '%s\n' "$existing_config" | ${pkgs.jq}/bin/jq \
       --arg milkyToken "$milky_token" \
       --arg onebotToken "$onebot_token" \
+      --arg satoriToken "$satori_token" \
       --argjson webuiPort ${toString cfg.webuiPort} \
       --argjson milkyPort ${toString cfg.milkyPort} \
+      --argjson satoriPort ${toString cfg.satoriPort} \
       --argjson onebotWsPort ${toString cfg.onebotWsPort} \
       ' .webui = (.webui // {})
         | .webui.enable = true
@@ -43,6 +46,11 @@ let
         | .milky.http.prefix = ""
         | .milky.http.accessToken = $milkyToken
         | .milky.webhook = (.milky.webhook // {urls: [], accessToken: ""})
+        | .satori = (.satori // {})
+        | .satori.enable = true
+        | .satori.host = "127.0.0.1"
+        | .satori.port = $satoriPort
+        | .satori.token = $satoriToken
         | .ob11 = (.ob11 // {})
         | .ob11.enable = true
         | (.ob11.connect | if type == "array" then . else [] end) as $connections
@@ -80,7 +88,7 @@ let
 in
 {
   options.ssvgg.llonebot = {
-    enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, and OneBot V11";
+    enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, Satori, and OneBot V11";
     llbotImage = lib.mkOption {
       type = lib.types.str;
       default = "docker.io/linyuchen/llbot:8.2.0";
@@ -111,6 +119,11 @@ in
       default = "ONEBOT_ACCESS_TOKEN";
       description = "Environment variable containing the OneBot V11 access token.";
     };
+    satoriTokenEnvironmentVariable = lib.mkOption {
+      type = lib.types.str;
+      default = "ONEBOT_ACCESS_TOKEN";
+      description = "Environment variable containing the Satori access token.";
+    };
     webuiPort = lib.mkOption {
       type = lib.types.port;
       default = 3080;
@@ -118,6 +131,10 @@ in
     milkyPort = lib.mkOption {
       type = lib.types.port;
       default = 3010;
+    };
+    satoriPort = lib.mkOption {
+      type = lib.types.port;
+      default = 5600;
     };
     pmhqPort = lib.mkOption {
       type = lib.types.port;
@@ -187,7 +204,7 @@ in
       "d ${cfg.dataDirectory}/llbot 0700 llonebot llonebot -"
     ];
     systemd.services.llonebot-config = {
-      description = "Prepare the LLOneBot Milky configuration";
+      description = "Prepare the LLBot protocol configuration";
       wantedBy = [ "multi-user.target" ];
       before = [ "podman-llbot.service" ];
       serviceConfig = {
