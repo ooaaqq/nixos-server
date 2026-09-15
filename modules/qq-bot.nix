@@ -10,8 +10,17 @@ let
   hasBilibili = cfg.bilibiliProject != null;
   hasNoneBot = hasMain || hasBilibili;
   playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
-  mainProject = cfg.mainProject;
-  bilibiliProject = cfg.bilibiliProject;
+  packagedProject =
+    project:
+    if project == null then
+      null
+    else
+      pkgs.runCommandLocal "qq-bot-project" { } ''
+        mkdir -p "$out"
+        cp -r ${project}/. "$out/"
+      '';
+  mainProject = packagedProject cfg.mainProject;
+  bilibiliProject = packagedProject cfg.bilibiliProject;
 
   startMain = pkgs.writeShellScript "qq-bot-main-start" ''
     set -euo pipefail
