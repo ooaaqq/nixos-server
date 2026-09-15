@@ -9,25 +9,9 @@ let
   hasMain = cfg.mainProject != null;
   hasBilibili = cfg.bilibiliProject != null;
   hasNoneBot = hasMain || hasBilibili;
-  hasParserLite = cfg.parserLiteSource != null;
   playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
-
-  packagedProject =
-    project: includeParserLite:
-    if project == null then
-      null
-    else
-      pkgs.runCommandLocal "qq-bot-project" { } ''
-        mkdir -p "$out"
-        cp -r ${project}/. "$out/"
-        ${lib.optionalString (includeParserLite && hasParserLite) ''
-          mkdir -p "$out/nonebot_plugin_parser_lite"
-          cp -r ${cfg.parserLiteSource}/src/nonebot_plugin_parser_lite/. "$out/nonebot_plugin_parser_lite/"
-        ''}
-      '';
-
-  mainProject = packagedProject cfg.mainProject true;
-  bilibiliProject = packagedProject cfg.bilibiliProject false;
+  mainProject = cfg.mainProject;
+  bilibiliProject = cfg.bilibiliProject;
 
   startMain = pkgs.writeShellScript "qq-bot-main-start" ''
     set -euo pipefail
@@ -52,6 +36,7 @@ let
     FONTCONFIG_FILE = playwrightBrowsers.fontconfigFile;
     LD_LIBRARY_PATH = lib.makeLibraryPath [
       pkgs.expat
+      pkgs.libglvnd
       pkgs.stdenv.cc.cc.lib
       pkgs.zlib
     ];
@@ -164,11 +149,6 @@ in
       default = null;
       description = "NoneBot project for the OneBot V11 Bilibili sidecar.";
     };
-    parserLiteSource = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = "Source directory for nonebot-plugin-parser-lite.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -176,10 +156,6 @@ in
       {
         assertion = hasMain || hasBilibili;
         message = "ssvgg.qqBot requires mainProject or bilibiliProject";
-      }
-      {
-        assertion = !hasParserLite || hasMain;
-        message = "ssvgg.qqBot.parserLiteSource requires mainProject";
       }
     ];
 
