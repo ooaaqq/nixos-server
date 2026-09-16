@@ -39,8 +39,8 @@
   noto-fonts-color-emoji,
 }:
 let
-  revision = "1234";
-  browserVersion = "151.0.7922.34";
+  revision = "1243";
+  browserVersion = "153.0.8010.12";
   baseUrl = "https://cdn.playwright.dev/builds/cft/${browserVersion}/linux64";
   fontconfigFile = makeFontsConf {
     fontDirectories = [
@@ -56,7 +56,7 @@ let
     src = fetchzip {
       url = "${baseUrl}/chrome-linux64.zip";
       stripRoot = true;
-      hash = "sha256-3/o8ZFVeL/YDuO+aax+qcm6xv77AX6Vl6meP+S05cTk=";
+      hash = "sha256-ORdMu1e4Peolr8rdfvzgeaFhC8RgBipaOsAm7e3ZeqE=";
     };
     nativeBuildInputs = [
       autoPatchelfHook
@@ -116,7 +116,7 @@ let
     src = fetchzip {
       url = "${baseUrl}/chrome-headless-shell-linux64.zip";
       stripRoot = false;
-      hash = "sha256-2w0Ul3tpzrVkfGHIbQGwEsCRmVUUy3OAShGhuoH6Rmw=";
+      hash = "sha256-GLqqZOwtnJig+ZCIT8FYsIxZGSFTmRwLbqNXeSOdJXA=";
     };
     nativeBuildInputs = [
       autoPatchelfHook
@@ -142,7 +142,7 @@ let
     '';
   };
 in
-linkFarm "playwright-browsers-1.62.0" {
+linkFarm "playwright-browsers-1.63.0" {
   "chromium-${revision}" = chromium;
   "chromium_headless_shell-${revision}" = chromiumHeadlessShell;
 }

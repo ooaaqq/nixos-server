@@ -9,7 +9,7 @@ let
   hasMain = cfg.mainProject != null;
   hasBilibili = cfg.bilibiliProject != null;
   hasNoneBot = hasMain || hasBilibili;
-  playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.62.nix { };
+  playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.63.nix { };
   packagedProject =
     project:
     if project == null then
