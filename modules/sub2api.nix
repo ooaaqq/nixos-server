@@ -7,10 +7,10 @@
 
 let
   cfg = config.ssvgg.sub2api;
-  version = "0.2.4";
+  version = "0.2.5";
   archive = pkgs.fetchurl {
     url = "https://github.com/Wei-Shaw/sub2api/releases/download/v${version}/sub2api_${version}_linux_amd64.tar.gz";
-    hash = "sha256-NcrimPq8L7wCan5YXVJmOjeJwTWNU2+10cuayYjASKI=";
+    hash = "sha256-puoEAcQEdIJQabVvXW2MhRe5Lvh1bUPzgQN7a0ohhcY=";
   };
   package = pkgs.runCommand "sub2api-${version}" { nativeBuildInputs = [ pkgs.gnutar ]; } ''
     mkdir -p "$out/bin"
