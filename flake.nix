@@ -7,7 +7,7 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.i915-sriov-dkms = {
-    url = "github:strongtz/i915-sriov-dkms/2026.09.14";
+    url = "github:strongtz/i915-sriov-dkms/2026.09.16";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
