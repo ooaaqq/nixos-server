@@ -91,7 +91,7 @@ in
     enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, Satori, and OneBot V11";
     llbotImage = lib.mkOption {
       type = lib.types.str;
-      default = "docker.io/linyuchen/llbot:8.2.0";
+      default = "docker.io/linyuchen/llbot:8.2.1";
     };
     pmhqImage = lib.mkOption {
       type = lib.types.str;
