@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.ssvgg.llonebot;
-  environmentFiles = lib.optional (cfg.environmentFile != null) cfg.environmentFile;
+  pmhqEnvironmentFiles = lib.optional (cfg.pmhqEnvironmentFile != null) cfg.pmhqEnvironmentFile;
   llbotConfigPath = "${cfg.dataDirectory}/llbot/config_${cfg.qqNumber}.json";
   prepareLlbotConfig = pkgs.writeShellScript "llonebot-prepare-llbot-config" ''
     set -euo pipefail
@@ -105,9 +105,10 @@ in
       type = lib.types.path;
       default = "/var/lib/llonebot";
     };
-    environmentFile = lib.mkOption {
+    pmhqEnvironmentFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
+      description = "Environment file containing PMHQ credentials, passed only to PMHQ and LLBot.";
     };
     milkyTokenEnvironmentVariable = lib.mkOption {
       type = lib.types.str;
@@ -162,7 +163,7 @@ in
         AUTO_LOGIN_QQ = cfg.qqNumber;
         TZ = "Asia/Shanghai";
       };
-      environmentFiles = environmentFiles;
+      environmentFiles = pmhqEnvironmentFiles;
       volumes = [ "${cfg.dataDirectory}/pmhq:/app/data" ];
       extraOptions = [
         "--network=host"
@@ -179,7 +180,7 @@ in
         WEBUI_PORT = toString cfg.webuiPort;
         TZ = "Asia/Shanghai";
       };
-      environmentFiles = environmentFiles;
+      environmentFiles = pmhqEnvironmentFiles;
       cmd = [ "--qq=${cfg.qqNumber}" ];
       volumes = [
         "${cfg.dataDirectory}/llbot:/app/llbot/data"
@@ -210,7 +211,6 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        EnvironmentFile = environmentFiles;
         ExecStart = prepareLlbotConfig;
       };
     };
