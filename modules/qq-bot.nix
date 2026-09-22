@@ -84,10 +84,12 @@ let
 
   runtimeConfigSetup = runtimeConfig: exampleConfig: extra: ''
     ${pkgs.coreutils}/bin/install -d -o qq-bot -g qq-bot -m 0700 "$(dirname ${lib.escapeShellArg runtimeConfig})"
-    if [ ! -s ${lib.escapeShellArg runtimeConfig} ] && [ -f ${lib.escapeShellArg exampleConfig} ]; then
-      ${pkgs.coreutils}/bin/install -o qq-bot -g qq-bot -m 0640 \
-        ${lib.escapeShellArg exampleConfig} ${lib.escapeShellArg runtimeConfig}
-    fi
+    ${lib.optionalString (exampleConfig != null) ''
+      if [ ! -s ${lib.escapeShellArg runtimeConfig} ] && [ -f ${lib.escapeShellArg exampleConfig} ]; then
+        ${pkgs.coreutils}/bin/install -o qq-bot -g qq-bot -m 0640 \
+          ${lib.escapeShellArg exampleConfig} ${lib.escapeShellArg runtimeConfig}
+      fi
+    ''}
     ${extra}
   '';
 in
@@ -124,11 +126,6 @@ in
       default = 3012;
       description = "Bilibili sidecar HTTP port.";
     };
-    environmentFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = "Environment file containing LLBot access tokens.";
-    };
     milkyTokenEnvironmentVariable = lib.mkOption {
       type = lib.types.str;
       default = "ONEBOT_ACCESS_TOKEN";
@@ -142,12 +139,22 @@ in
     mainRuntimeConfigFile = lib.mkOption {
       type = lib.types.path;
       default = "/var/lib/qq-bot/main/config/nonebot.env";
-      description = "Mutable runtime configuration for the Milky instance.";
+      description = "Mutable live configuration for the Milky instance; deployments do not overwrite it.";
+    };
+    mainRuntimeConfigSeedFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "One-time seed copied to mainRuntimeConfigFile only when the live file is absent.";
     };
     bilibiliRuntimeConfigFile = lib.mkOption {
       type = lib.types.path;
       default = "/var/lib/qq-bot/bilibili/config/nonebot.env";
-      description = "Mutable runtime configuration for the Bilibili sidecar.";
+      description = "Mutable live configuration for the Bilibili sidecar; deployments do not overwrite it.";
+    };
+    bilibiliRuntimeConfigSeedFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = "One-time seed copied to bilibiliRuntimeConfigFile only when the live file is absent.";
     };
     mainProject = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -213,7 +220,7 @@ in
         PORT = toString cfg.mainPort;
       };
       path = commonPath;
-      preStart = runtimeConfigSetup cfg.mainRuntimeConfigFile "${cfg.mainProject}/nonebot.env.example" ''
+      preStart = runtimeConfigSetup cfg.mainRuntimeConfigFile cfg.mainRuntimeConfigSeedFile ''
         parser_cache=/var/cache/qq-bot/main/nonebot_plugin_parser_lite
         if [ -d "$parser_cache" ]; then
           ${pkgs.findutils}/bin/find "$parser_cache" -type d -exec ${pkgs.coreutils}/bin/chmod 0755 {} +
@@ -226,9 +233,7 @@ in
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
-        EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile ++ [
-          cfg.mainRuntimeConfigFile
-        ];
+        EnvironmentFile = [ cfg.mainRuntimeConfigFile ];
         WorkingDirectory = mainProject;
         ExecStart = startMain;
         Restart = "on-failure";
@@ -249,15 +254,11 @@ in
       ];
       environment = bilibiliEnvironment;
       path = commonPath;
-      preStart =
-        runtimeConfigSetup cfg.bilibiliRuntimeConfigFile "${cfg.bilibiliProject}/nonebot.env.example"
-          "";
+      preStart = runtimeConfigSetup cfg.bilibiliRuntimeConfigFile cfg.bilibiliRuntimeConfigSeedFile "";
       serviceConfig = {
         User = "qq-bot";
         Group = "qq-bot";
-        EnvironmentFile = lib.optional (cfg.environmentFile != null) cfg.environmentFile ++ [
-          cfg.bilibiliRuntimeConfigFile
-        ];
+        EnvironmentFile = [ cfg.bilibiliRuntimeConfigFile ];
         WorkingDirectory = bilibiliProject;
         ExecStart = startBilibili;
         Restart = "on-failure";
