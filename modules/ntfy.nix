@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
@@ -15,11 +14,6 @@ in
       type = lib.types.str;
       default = "ntfy.example.com";
       description = "Public hostname for the ntfy service.";
-    };
-    topic = lib.mkOption {
-      type = lib.types.strMatching "[A-Za-z0-9_-]{1,64}";
-      default = "inbox";
-      description = "Anonymous topic granted read/write access.";
     };
   };
 
@@ -42,6 +36,7 @@ in
         auth-default-access = "deny-all";
         enable-login = false;
         enable-signup = false;
+        "auth-access" = [ "everyone:inbox:rw" ];
 
         cache-duration = "30d";
         message-size-limit = "4K";
@@ -51,20 +46,7 @@ in
       };
     };
 
-    # Keep only the public inbox open while all other topics remain denied.
     systemd.services.ntfy-sh = {
-      # ntfy creates auth-file on its first start, so this must run afterwards.
-      postStart = ''
-        for _ in $(seq 1 20); do
-          if [ -e /var/lib/ntfy-sh/user.db ]; then
-            ${pkgs.ntfy-sh}/bin/ntfy access --config /etc/ntfy/server.yml everyone ${lib.escapeShellArg cfg.topic} rw
-            exit 0
-          fi
-          sleep 0.5
-        done
-        echo "ntfy auth database was not created" >&2
-        exit 1
-      '';
       serviceConfig = {
         Restart = "on-failure";
         RestartSec = "5s";
