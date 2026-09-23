@@ -1,49 +1,15 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
   cfg = config.ssvgg.llonebot;
   pmhqEnvironmentFiles = lib.optional (cfg.pmhqEnvironmentFile != null) cfg.pmhqEnvironmentFile;
-  llbotConfigPath = "${cfg.dataDirectory}/llbot/config_${cfg.qqNumber}.json";
-  prepareLlbotConfig = pkgs.writeShellScript "llonebot-prepare-llbot-config" ''
-    set -euo pipefail
-
-    config_path=${lib.escapeShellArg llbotConfigPath}
-    ${pkgs.coreutils}/bin/install -d -m 0700 -o llonebot -g llonebot "$(dirname "$config_path")"
-    milky_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
-    onebot_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.onebotTokenEnvironmentVariable} || true)"
-    satori_token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.satoriTokenEnvironmentVariable} || true)"
-    temporary_path="$(${pkgs.coreutils}/bin/mktemp "$(dirname "$config_path")/.config.XXXXXX")"
-    trap '${pkgs.coreutils}/bin/rm -f "$temporary_path"' EXIT
-
-    if [ -e "$config_path" ]; then
-      existing_config="$(${pkgs.coreutils}/bin/cat "$config_path")"
-    else
-      existing_config='{}'
-    fi
-
-    printf '%s\n' "$existing_config" | ${pkgs.jq}/bin/jq \
-      --arg milkyToken "$milky_token" \
-      --arg onebotToken "$onebot_token" \
-      --arg satoriToken "$satori_token" \
-      --argjson webuiPort ${toString cfg.webuiPort} \
-      --argjson milkyPort ${toString cfg.milkyPort} \
-      --argjson satoriPort ${toString cfg.satoriPort} \
-      --argjson onebotWsPort ${toString cfg.onebotWsPort} \
-      --argjson onebotReverseWsUrls ${lib.escapeShellArg (builtins.toJSON cfg.onebotReverseWsUrls)} \
-      --from-file ${./llonebot-config.jq} > "$temporary_path"
-
-    ${pkgs.coreutils}/bin/chown llonebot:llonebot "$temporary_path"
-    ${pkgs.coreutils}/bin/chmod 0600 "$temporary_path"
-    ${pkgs.coreutils}/bin/mv "$temporary_path" "$config_path"
-  '';
 in
 {
   options.ssvgg.llonebot = {
-    enable = lib.mkEnableOption "LLOneBot with PMHQ, Milky, Satori, and OneBot V11";
+    enable = lib.mkEnableOption "LLOneBot with PMHQ";
     llbotImage = lib.mkOption {
       type = lib.types.str;
       default = "docker.io/linyuchen/llbot:8.2.1";
@@ -65,46 +31,14 @@ in
       default = null;
       description = "Environment file containing PMHQ credentials, passed only to PMHQ and LLBot.";
     };
-    milkyTokenEnvironmentVariable = lib.mkOption {
-      type = lib.types.str;
-      default = "ONEBOT_ACCESS_TOKEN";
-      description = "Environment variable containing the Milky access token.";
-    };
-    onebotTokenEnvironmentVariable = lib.mkOption {
-      type = lib.types.str;
-      default = "ONEBOT_ACCESS_TOKEN";
-      description = "Environment variable containing the OneBot V11 access token.";
-    };
-    satoriTokenEnvironmentVariable = lib.mkOption {
-      type = lib.types.str;
-      default = "ONEBOT_ACCESS_TOKEN";
-      description = "Environment variable containing the Satori access token.";
-    };
     webuiPort = lib.mkOption {
       type = lib.types.port;
       default = 3080;
-    };
-    milkyPort = lib.mkOption {
-      type = lib.types.port;
-      default = 3010;
-    };
-    satoriPort = lib.mkOption {
-      type = lib.types.port;
-      default = 5600;
+      description = "Loopback WebUI port used for the SSH tunnel and health checks.";
     };
     pmhqPort = lib.mkOption {
       type = lib.types.port;
       default = 13000;
-    };
-    onebotWsPort = lib.mkOption {
-      type = lib.types.port;
-      default = 3001;
-      description = "OneBot V11 forward WebSocket server port.";
-    };
-    onebotReverseWsUrls = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      description = "OneBot V11 reverse WebSocket endpoints for LLBot to connect to.";
     };
     sharedMediaDirectory = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -164,27 +98,13 @@ in
       "d ${cfg.dataDirectory}/pmhq 0700 llonebot llonebot -"
       "d ${cfg.dataDirectory}/llbot 0700 llonebot llonebot -"
     ];
-    systemd.services.llonebot-config = {
-      description = "Prepare the LLBot protocol configuration";
-      wantedBy = [ "multi-user.target" ];
-      before = [ "podman-llbot.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        ExecStart = prepareLlbotConfig;
-      };
-    };
     systemd.services.podman-pmhq = {
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
     };
     systemd.services.podman-llbot = {
-      requires = [ "llonebot-config.service" ];
       wants = [ "podman-pmhq.service" ];
-      after = [
-        "llonebot-config.service"
-        "podman-pmhq.service"
-      ];
+      after = [ "podman-pmhq.service" ];
     };
   };
 }

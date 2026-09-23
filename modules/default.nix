@@ -3,7 +3,6 @@
     ./bilibili-live-helper.nix
     ./bililive-recorder.nix
     ./astrbot.nix
-    ./dont-starve-together.nix
     ./minecraft-forge.nix
     ./ntfy.nix
     ./silverbullet.nix
