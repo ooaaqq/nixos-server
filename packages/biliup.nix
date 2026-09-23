@@ -6,11 +6,11 @@
 
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "biliup";
-  version = "1.2.6";
+  version = "1.2.7";
 
   src = fetchurl {
     url = "https://github.com/biliup/biliup/releases/download/v${finalAttrs.version}/biliupR-v${finalAttrs.version}-x86_64-linux-musl.tar.xz";
-    hash = "sha256-DP4ZLMPY0C/VS5Thx7RaeCzL6++G106NntRl33wDZLc=";
+    hash = "sha256-i09ViWqQos8RdX63VmkIdpGneqyskGhVR+CAiyJPAZc=";
   };
 
   sourceRoot = "biliupR-v${finalAttrs.version}-x86_64-linux-musl";

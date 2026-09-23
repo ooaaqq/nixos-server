@@ -8,11 +8,11 @@
 let
   cfg = config.ssvgg.silverbullet;
   source = pkgs.fetchzip {
-    url = "https://github.com/silverbulletmd/silverbullet/releases/download/2.11.0/silverbullet-server-linux-x86_64.zip";
-    hash = "sha256-IVO3zalByEcBWWdlXjVfl4kf23lCuI8DIXNVj1XXl5Y=";
+    url = "https://github.com/silverbulletmd/silverbullet/releases/download/2.11.1/silverbullet-server-linux-x86_64.zip";
+    hash = "sha256-gq8NXQCMN3zbS0nb0h2w0h+NFGGe+kCw/erh3Od40Bg=";
     stripRoot = false;
   };
-  silverbullet = pkgs.runCommand "silverbullet-2.11.0" { } ''
+  silverbullet = pkgs.runCommand "silverbullet-2.11.1" { } ''
     install -Dm755 ${source}/silverbullet "$out/bin/silverbullet"
   '';
   healthMonitor = pkgs.writeShellApplication {
