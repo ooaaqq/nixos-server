@@ -33,6 +33,7 @@ let
       --argjson milkyPort ${toString cfg.milkyPort} \
       --argjson satoriPort ${toString cfg.satoriPort} \
       --argjson onebotWsPort ${toString cfg.onebotWsPort} \
+      --argjson onebotReverseWsUrls ${lib.escapeShellArg (builtins.toJSON cfg.onebotReverseWsUrls)} \
       ' .webui = (.webui // {})
         | .webui.enable = true
         | .webui.host = "0.0.0.0"
@@ -79,7 +80,34 @@ let
                 reportOfflineMessage: false,
                 debug: false
               }]
-              end)' > "$temporary_path"
+              end
+            | reduce $onebotReverseWsUrls[] as $url (.;
+                if any(.[]; .type == "ws-reverse" and .url == $url) then
+                  map(if .type == "ws-reverse" and .url == $url then
+                    . + {
+                      enable: true,
+                      url: $url,
+                      heartInterval: 60000,
+                      token: $onebotToken,
+                      messageFormat: "array",
+                      reportSelfMessage: false,
+                      reportOfflineMessage: false,
+                      debug: false
+                    }
+                  else . end)
+                else . + [{
+                  type: "ws-reverse",
+                  enable: true,
+                  url: $url,
+                  heartInterval: 60000,
+                  token: $onebotToken,
+                  messageFormat: "array",
+                  reportSelfMessage: false,
+                  reportOfflineMessage: false,
+                  debug: false
+                }]
+                end
+              )' > "$temporary_path"
 
     ${pkgs.coreutils}/bin/chown llonebot:llonebot "$temporary_path"
     ${pkgs.coreutils}/bin/chmod 0600 "$temporary_path"
@@ -145,6 +173,11 @@ in
       type = lib.types.port;
       default = 3001;
       description = "OneBot V11 forward WebSocket server port.";
+    };
+    onebotReverseWsUrls = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "OneBot V11 reverse WebSocket endpoints for LLBot to connect to.";
     };
     sharedMediaDirectory = lib.mkOption {
       type = lib.types.nullOr lib.types.path;

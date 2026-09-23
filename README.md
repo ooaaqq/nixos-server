@@ -26,6 +26,7 @@ Import all service options once, then enable only the required services:
     enable = true;
     domain = "api.example.com";
   };
+  ssvgg.astrbot.enable = true;
 }
 ```
 
