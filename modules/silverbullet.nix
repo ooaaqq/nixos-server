@@ -9,7 +9,7 @@ let
   cfg = config.ssvgg.silverbullet;
   source = pkgs.fetchzip {
     url = "https://github.com/silverbulletmd/silverbullet/releases/download/2.11.1/silverbullet-server-linux-x86_64.zip";
-    hash = "sha256-gq8NXQCMN3zbS0nb0h2w0h+NFGGe+kCw/erh3Od40Bg=";
+    hash = "sha256-F+1RvMn+dEoCslvh066yGaY4BDTk9x2hPtgNJCn4CKU=";
     stripRoot = false;
   };
   silverbullet = pkgs.runCommand "silverbullet-2.11.1" { } ''
