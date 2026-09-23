@@ -24,6 +24,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       moduleFiles = {
         default = ./modules/default.nix;
+        astrbot = ./modules/astrbot.nix;
         bilibili-live-helper = ./modules/bilibili-live-helper.nix;
         bililive-recorder = ./modules/bililive-recorder.nix;
         dont-starve-together = ./modules/dont-starve-together.nix;
@@ -66,6 +67,7 @@
           {
             boot.isContainer = true;
             networking.hostName = "nixos-server-example";
+            ssvgg.astrbot.enable = true;
             system.stateVersion = "26.05";
           }
         ];
