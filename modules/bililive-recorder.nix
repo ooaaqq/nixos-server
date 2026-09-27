@@ -276,7 +276,7 @@ in
           };
 
           density = lib.mkOption {
-            type = lib.types.ints;
+            type = lib.types.int;
             default = -1;
             description = "DanmakuFactory density; -1 requests non-overlapping scrolling comments.";
           };
