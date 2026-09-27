@@ -84,11 +84,15 @@
 
       packages.${system} = {
         biliup = pkgs.callPackage ./packages/biliup.nix { };
+        danmaku-factory = pkgs.callPackage ./packages/danmaku-factory.nix { };
+        noto-emoji-mono = pkgs.callPackage ./packages/noto-emoji-mono.nix { };
         playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
       };
       checks.${system} = {
         example = example.config.system.build.toplevel;
         biliup = pkgs.callPackage ./packages/biliup.nix { };
+        danmaku-factory = pkgs.callPackage ./packages/danmaku-factory.nix { };
+        noto-emoji-mono = pkgs.callPackage ./packages/noto-emoji-mono.nix { };
         playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
       };
 
