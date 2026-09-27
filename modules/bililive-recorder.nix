@@ -9,6 +9,18 @@ let
   cfg = config.ssvgg.bililiveRecorder;
   credentials = config.sops.secrets."bilibili/cookies";
   biliup = pkgs.callPackage ../packages/biliup.nix { };
+  danmakuFactory = pkgs.callPackage ../packages/danmaku-factory.nix { };
+  monochromeEmojiFont = pkgs.callPackage ../packages/noto-emoji-mono.nix { };
+  danmakuFonts = pkgs.runCommand "bililive-recorder-danmaku-fonts" { } ''
+    mkdir -p "$out"
+    ln -s "${pkgs.noto-fonts-cjk-sans}/share/fonts/opentype/noto-cjk/NotoSansCJK-VF.otf.ttc" \
+      "$out/NotoSansCJK-VF.otf.ttc"
+    ln -s "${monochromeEmojiFont}/share/fonts/opentype/noto/NotoEmoji.otf" \
+      "$out/NotoEmoji.otf"
+  '';
+  fontconfigFile = pkgs.makeFontsConf {
+    fontDirectories = [ danmakuFonts ];
+  };
   recorderConfig = pkgs.writeText "bililive-recorder-config.json" (
     builtins.toJSON {
       version = 3;
@@ -87,6 +99,34 @@ let
       title = cfg.uploadTitle;
       description = cfg.uploadDescription;
       tags = cfg.uploadTags;
+      danmaku = {
+        room_ids = cfg.danmaku.roomIds;
+        settings = {
+          scroll_time = cfg.danmaku.scrollTime;
+          density = cfg.danmaku.density;
+          font_size = cfg.danmaku.fontSize;
+          font_name = cfg.danmaku.fontName;
+          opacity = cfg.danmaku.opacity;
+          outline = cfg.danmaku.outline;
+          shadow = cfg.danmaku.shadow;
+          show_usernames = cfg.danmaku.showUsernames;
+          show_message_boxes = cfg.danmaku.showMessageBoxes;
+          crf = cfg.danmaku.crf;
+          max_rate_kbit = cfg.danmaku.maxRateKbit;
+          buffer_size_kbit = cfg.danmaku.bufferSizeKbit;
+          preset = cfg.danmaku.preset;
+          threads = cfg.danmaku.threads;
+        };
+      };
+      collection =
+        if cfg.collection.roomIds == [ ] then
+          null
+        else
+          {
+            room_ids = cfg.collection.roomIds;
+            season_title = cfg.collection.seasonTitle;
+            section_title = cfg.collection.sectionTitle;
+          };
     }
   );
   prepareConfig = pkgs.writeShellApplication {
@@ -143,7 +183,9 @@ let
       remove_bundle() {
         local flv="$1"
         local base="''${flv%.flv}"
-        rm -f -- "$flv" "$base.xml" "$base.cover.jpg"
+        rm -f -- "$flv" "$base.xml" "$base.cover.jpg" \
+          "$base-纯净版.flv" "$base-弹幕版.ass" "$base-弹幕版.partial.mp4" \
+          "$base-弹幕版.mp4"
       }
 
       while IFS= read -r -d "" flv; do
@@ -218,6 +260,137 @@ in
       description = "Tags attached to private uploads.";
     };
 
+    danmaku = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          roomIds = lib.mkOption {
+            type = lib.types.listOf lib.types.ints.positive;
+            default = [ ];
+            description = "Rooms whose uploads include source and burned-danmaku parts.";
+          };
+
+          scrollTime = lib.mkOption {
+            type = lib.types.ints.positive;
+            default = 12;
+            description = "Seconds for scrolling danmaku to cross the screen.";
+          };
+
+          density = lib.mkOption {
+            type = lib.types.ints;
+            default = -1;
+            description = "DanmakuFactory density; -1 requests non-overlapping scrolling comments.";
+          };
+
+          fontSize = lib.mkOption {
+            type = lib.types.ints.positive;
+            default = 32;
+            description = "Danmaku font size in pixels.";
+          };
+
+          fontName = lib.mkOption {
+            type = lib.types.nonEmptyStr;
+            default = "Noto Sans CJK SC";
+            description = "Base font family used for danmaku.";
+          };
+
+          opacity = lib.mkOption {
+            type = lib.types.ints.between 1 255;
+            default = 255;
+            description = "Opacity for ordinary danmaku, from 1 to 255.";
+          };
+
+          outline = lib.mkOption {
+            type = lib.types.float;
+            default = 0.8;
+            description = "Thin text outline width in pixels.";
+          };
+
+          shadow = lib.mkOption {
+            type = lib.types.ints.between 0 4;
+            default = 0;
+            description = "Danmaku shadow depth.";
+          };
+
+          showUsernames = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether to include danmaku usernames.";
+          };
+
+          showMessageBoxes = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether to render gifts, Super Chat, and guard message boxes.";
+          };
+
+          crf = lib.mkOption {
+            type = lib.types.ints.between 0 51;
+            default = 22;
+            description = "x264 constant-rate-factor for burned-danmaku parts.";
+          };
+
+          maxRateKbit = lib.mkOption {
+            type = lib.types.ints.positive;
+            default = 18000;
+            description = "Maximum x264 bitrate in kbit/s.";
+          };
+
+          bufferSizeKbit = lib.mkOption {
+            type = lib.types.ints.positive;
+            default = 36000;
+            description = "x264 VBV buffer size in kbit/s.";
+          };
+
+          preset = lib.mkOption {
+            type = lib.types.enum [
+              "ultrafast"
+              "superfast"
+              "veryfast"
+              "faster"
+              "fast"
+              "medium"
+            ];
+            default = "veryfast";
+            description = "x264 speed and compression preset.";
+          };
+
+          threads = lib.mkOption {
+            type = lib.types.ints.positive;
+            default = 4;
+            description = "Maximum x264 worker threads per transcode.";
+          };
+        };
+      };
+      default = { };
+      description = "Settings for burned-in danmaku uploads.";
+    };
+
+    collection = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          roomIds = lib.mkOption {
+            type = lib.types.listOf lib.types.ints.positive;
+            default = [ ];
+            description = "Rooms whose uploaded archives should be added to a Bilibili collection.";
+          };
+
+          seasonTitle = lib.mkOption {
+            type = lib.types.nonEmptyStr;
+            default = "露早录播";
+            description = "Exact Bilibili collection title to match.";
+          };
+
+          sectionTitle = lib.mkOption {
+            type = lib.types.nonEmptyStr;
+            default = "正片";
+            description = "Exact section title within the collection.";
+          };
+        };
+      };
+      default = { };
+      description = "Bilibili collection assignment after upload.";
+    };
+
     ntfyServer = lib.mkOption {
       type = lib.types.str;
       default = "http://127.0.0.1:2586";
@@ -252,6 +425,34 @@ in
       {
         assertion = cfg.uploadTags != [ ] && lib.all (tag: !(lib.hasInfix "," tag)) cfg.uploadTags;
         message = "ssvgg.bililiveRecorder.uploadTags must be non-empty and contain no commas";
+      }
+      {
+        assertion =
+          lib.length cfg.danmaku.roomIds == lib.length (lib.unique cfg.danmaku.roomIds)
+          && lib.all (roomId: lib.elem roomId cfg.roomIds) cfg.danmaku.roomIds;
+        message = "ssvgg.bililiveRecorder.danmaku.roomIds must be unique configured recorder rooms";
+      }
+      {
+        assertion = cfg.danmaku.roomIds == [ ] || cfg.upload;
+        message = "ssvgg.bililiveRecorder.danmaku.roomIds requires upload = true";
+      }
+      {
+        assertion =
+          lib.length cfg.collection.roomIds == lib.length (lib.unique cfg.collection.roomIds)
+          && lib.all (roomId: lib.elem roomId cfg.danmaku.roomIds) cfg.collection.roomIds;
+        message = "ssvgg.bililiveRecorder.collection.roomIds must be unique rooms with danmaku uploads enabled";
+      }
+      {
+        assertion = cfg.collection.roomIds == [ ] || cfg.upload;
+        message = "ssvgg.bililiveRecorder.collection.roomIds requires upload = true";
+      }
+      {
+        assertion = cfg.danmaku.outline >= 0.0 && cfg.danmaku.outline <= 4.0;
+        message = "ssvgg.bililiveRecorder.danmaku.outline must be between 0 and 4";
+      }
+      {
+        assertion = cfg.danmaku.bufferSizeKbit >= cfg.danmaku.maxRateKbit;
+        message = "ssvgg.bililiveRecorder.danmaku.bufferSizeKbit must be at least maxRateKbit";
       }
     ];
 
@@ -294,11 +495,25 @@ in
             "--upload-line alia"
             "--upload-metadata ${uploadMetadata}"
           ]
+          ++ lib.optionals (cfg.danmaku.roomIds != [ ]) [
+            "--danmaku-factory ${danmakuFactory}/bin/DanmakuFactory"
+            "--ffmpeg ${pkgs.ffmpeg-headless}/bin/ffmpeg"
+            "--ffprobe ${pkgs.ffmpeg-headless}/bin/ffprobe"
+            "--fonts-directory ${danmakuFonts}"
+          ]
         );
         LoadCredential = lib.mkIf cfg.upload "cookies.json:${credentials.path}";
         ExecStartPre = lib.mkIf cfg.upload "${prepareUploaderCredential}/bin/bililive-recorder-prepare-uploader-credential";
-        Environment = lib.mkIf cfg.upload "XDG_DATA_HOME=/var/lib/bililive-recorder-notifier";
+        Environment =
+          lib.optionals cfg.upload [ "XDG_DATA_HOME=/var/lib/bililive-recorder-notifier" ]
+          ++ lib.optionals (cfg.danmaku.roomIds != [ ]) [
+            "FONTCONFIG_FILE=${fontconfigFile}"
+            "XDG_CACHE_HOME=/var/lib/bililive-recorder-notifier/font-cache"
+          ];
         WorkingDirectory = lib.mkIf cfg.upload "/var/lib/bililive-recorder-notifier";
+        ReadWritePaths = lib.optionals (cfg.danmaku.roomIds != [ ]) [
+          "/var/lib/bililive-recorder/recordings"
+        ];
         User = "bililive-recorder";
         Group = "bililive-recorder";
         StateDirectory = "bililive-recorder-notifier";
@@ -307,7 +522,7 @@ in
         Restart = "on-failure";
         RestartSec = "10s";
         TimeoutStopSec = "15s";
-        MemoryMax = if cfg.upload then "512M" else "96M";
+        MemoryMax = if cfg.upload then "2G" else "96M";
         CapabilityBoundingSet = "";
         LockPersonality = true;
         NoNewPrivileges = true;
