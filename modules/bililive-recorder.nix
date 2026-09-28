@@ -162,9 +162,16 @@ let
         '.cookie_info.cookies | type == "array" and length > 0' \
         "$source" >/dev/null
       source_hash=$(sha256sum "$source" | cut -d ' ' -f 1)
-      if [[ ! -s "$destination" ]] || [[ ! -f "$marker" ]] || [[ "$(<"$marker")" != "$source_hash" ]]; then
-        install -m 0600 "$source" "$destination"
-        printf '%s\n' "$source_hash" > "$marker"
+      if [[ ! -s "$destination" ]] \
+        || [[ ! -r "$destination" ]] \
+        || [[ ! -f "$marker" ]] \
+        || [[ ! -r "$marker" ]] \
+        || [[ "$(<"$marker")" != "$source_hash" ]]; then
+        install -m 0600 "$source" "$destination.new"
+        printf '%s\n' "$source_hash" > "$marker.new"
+        chmod 0600 "$marker.new"
+        mv -f "$destination.new" "$destination"
+        mv -f "$marker.new" "$marker"
       fi
     '';
   };

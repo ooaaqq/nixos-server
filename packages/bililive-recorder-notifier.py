@@ -33,6 +33,7 @@ def empty_state() -> dict[str, Any]:
         "sessions": {},
         "session_aliases": {},
         "uploads": {},
+        "completed_uploads": {},
     }
 
 
@@ -52,6 +53,7 @@ class StateStore:
         state.setdefault("sessions", {})
         state.setdefault("session_aliases", {})
         state.setdefault("uploads", {})
+        state.setdefault("completed_uploads", {})
         return state
 
     def save(self, state: dict[str, Any]) -> None:
@@ -363,6 +365,13 @@ class NotificationApp:
                 files = self._resolve_recordings(upload["paths"])
                 if not files:
                     raise ValueError("upload has no closed FLV segments")
+                source_stamps = {
+                    relative_path: {
+                        "size": path.stat().st_size,
+                        "mtime_ns": path.stat().st_mtime_ns,
+                    }
+                    for relative_path, path in zip(upload["paths"], files, strict=True)
+                }
                 result = self.run_command(
                     self._upload_command(upload, files),
                     check=False,
@@ -390,8 +399,25 @@ class NotificationApp:
                 LOG.warning("Upload %s remains queued: %s", upload["upload_id"], error)
                 continue
 
+            completed_files = {}
+            for relative_path, path in zip(upload["paths"], files, strict=True):
+                try:
+                    current = path.stat()
+                except OSError:
+                    continue
+                stamp = source_stamps[relative_path]
+                if (current.st_size, current.st_mtime_ns) == (
+                    stamp["size"],
+                    stamp["mtime_ns"],
+                ):
+                    completed_files[relative_path] = stamp
+
             with self.lock:
                 self.state["uploads"].pop(upload["upload_id"], None)
+                self.state["completed_uploads"][upload["upload_id"]] = {
+                    "completed_at": self.wall_time(),
+                    "files": completed_files,
+                }
                 self._queue(
                     f"{upload['upload_id']}-done",
                     title=f"「{upload['name']}」 Uploaded privately · {self.node}",
