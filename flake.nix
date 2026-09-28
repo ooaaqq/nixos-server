@@ -30,7 +30,6 @@
         minecraft-forge = ./modules/minecraft-forge.nix;
         ntfy = ./modules/ntfy.nix;
         harp-web = ./modules/harp-web.nix;
-        silverbullet = ./modules/silverbullet.nix;
         ss2022 = ./modules/ss2022.nix;
         sub2api = ./modules/sub2api.nix;
         web = ./modules/web.nix;
