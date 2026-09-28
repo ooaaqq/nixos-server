@@ -24,7 +24,7 @@ let
     text = ''
       state_directory=/var/lib/bilibili-live-helper-health
       marker="$state_directory/alerted"
-      endpoint=http://127.0.0.1:2586/inbox
+      endpoint=${lib.escapeShellArg cfg.healthNtfyEndpoint}
       healthcheck=${package}/bin/bilibili-live-helper-healthcheck
 
       if message="$("$healthcheck" 2>&1)"; then
@@ -70,6 +70,12 @@ in
     accessKeyFile = lib.mkOption {
       type = lib.types.path;
       description = "SOPS file containing the access key for this machine.";
+    };
+
+    healthNtfyEndpoint = lib.mkOption {
+      type = lib.types.nonEmptyStr;
+      default = "http://127.0.0.1:2586/inbox";
+      description = "ntfy publish endpoint for helper health alerts.";
     };
   };
 
