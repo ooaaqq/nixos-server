@@ -103,6 +103,7 @@
           nix
           nixfmt
           nixfmt-tree
+          nodejs
           python3
           shellcheck
         ];

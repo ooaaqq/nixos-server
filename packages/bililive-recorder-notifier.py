@@ -3,6 +3,7 @@
 import argparse
 import json
 import logging
+import math
 import os
 import re
 import signal
@@ -34,6 +35,7 @@ def empty_state() -> dict[str, Any]:
         "session_aliases": {},
         "uploads": {},
         "completed_uploads": {},
+        "skipped_uploads": {},
     }
 
 
@@ -54,6 +56,7 @@ class StateStore:
         state.setdefault("session_aliases", {})
         state.setdefault("uploads", {})
         state.setdefault("completed_uploads", {})
+        state.setdefault("skipped_uploads", {})
         return state
 
     def save(self, state: dict[str, Any]) -> None:
@@ -98,8 +101,10 @@ def load_upload_metadata(path: Path) -> tuple[str, str, str]:
         raise ValueError("upload title template must be a non-empty string")
     if not isinstance(description, str) or not description:
         raise ValueError("upload description template must be a non-empty string")
-    if not isinstance(tags, list) or not tags or not all(
-        isinstance(tag, str) and tag and "," not in tag for tag in tags
+    if (
+        not isinstance(tags, list)
+        or not tags
+        or not all(isinstance(tag, str) and tag and "," not in tag for tag in tags)
     ):
         raise ValueError("upload tags must be non-empty strings without commas")
     return title, description, ",".join(tags)
@@ -121,11 +126,15 @@ class NotificationApp:
         upload_title: str = "{name} 直播回放 {title} {date}",
         upload_description: str = "直播间：https://live.bilibili.com/{room_id}\n由 {node} 自动录制上传。",
         upload_tags: str = "录播,直播回放",
+        ffprobe: Path | None = None,
+        minimum_upload_duration: float = 0,
         run_command: Any = subprocess.run,
         wall_time: Any = time.time,
     ):
         if not SAFE_NODE.fullmatch(node):
-            raise ValueError("node must contain only letters, numbers, underscores, or hyphens")
+            raise ValueError(
+                "node must contain only letters, numbers, underscores, or hyphens"
+            )
         self.node = node
         if not room_ids or len(room_ids) != len(set(room_ids)):
             raise ValueError("room IDs must be non-empty and unique")
@@ -140,6 +149,12 @@ class NotificationApp:
         self.upload_title = upload_title
         self.upload_description = upload_description
         self.upload_tags = upload_tags
+        if minimum_upload_duration < 0 or not math.isfinite(minimum_upload_duration):
+            raise ValueError("minimum upload duration must be finite and non-negative")
+        if minimum_upload_duration > 0 and ffprobe is None:
+            raise ValueError("duration filtering requires ffprobe")
+        self.ffprobe = ffprobe
+        self.minimum_upload_duration = minimum_upload_duration
         self.run_command = run_command
         self.wall_time = wall_time
         self.state = store.load()
@@ -237,9 +252,9 @@ class NotificationApp:
         target["files"] += predecessor.get("files", 0)
         target["size"] += predecessor.get("size", 0)
         target["duration"] += predecessor.get("duration", 0.0)
-        target["paths"] = list(dict.fromkeys(
-            [*predecessor.get("paths", []), *target.get("paths", [])]
-        ))
+        target["paths"] = list(
+            dict.fromkeys([*predecessor.get("paths", []), *target.get("paths", [])])
+        )
         target["started_at"] = predecessor.get("started_at", target["started_at"])
         target["started_at_epoch"] = min(
             float(predecessor.get("started_at_epoch", target["started_at_epoch"])),
@@ -372,6 +387,51 @@ class NotificationApp:
                     }
                     for relative_path, path in zip(upload["paths"], files, strict=True)
                 }
+                selected_paths = []
+                selected_files = []
+                skipped_files = {}
+                for relative_path, path in zip(upload["paths"], files, strict=True):
+                    duration = (
+                        self._recording_duration(path)
+                        if self.minimum_upload_duration > 0
+                        else None
+                    )
+                    if duration is not None and duration < self.minimum_upload_duration:
+                        current = path.stat()
+                        stamp = source_stamps[relative_path]
+                        if (current.st_size, current.st_mtime_ns) != (
+                            stamp["size"],
+                            stamp["mtime_ns"],
+                        ):
+                            raise OSError("recording changed during duration check")
+                        skipped_files[relative_path] = {**stamp, "duration": duration}
+                    else:
+                        selected_paths.append(relative_path)
+                        selected_files.append(path)
+                if skipped_files:
+                    with self.lock:
+                        self.state["skipped_uploads"][upload["upload_id"]] = {
+                            "reason": "below_minimum_duration",
+                            "minimum_duration": self.minimum_upload_duration,
+                            "files": skipped_files,
+                        }
+                        if not selected_files:
+                            self.state["uploads"].pop(upload["upload_id"], None)
+                            self._queue(
+                                f"{upload['upload_id']}-skipped",
+                                title=f"「{upload['name']}」 Short parts retained · {self.node}",
+                                message=f"Room {upload['room_id']} | {len(skipped_files)} short parts excluded from upload",
+                                tags=["information_source"],
+                            )
+                        self.store.save(self.state)
+                    LOG.info(
+                        "Upload %s excluded %d short parts; originals retained",
+                        upload["upload_id"],
+                        len(skipped_files),
+                    )
+                if not selected_files:
+                    continue
+                files = selected_files
                 result = self.run_command(
                     self._upload_command(upload, files),
                     check=False,
@@ -400,7 +460,7 @@ class NotificationApp:
                 continue
 
             completed_files = {}
-            for relative_path, path in zip(upload["paths"], files, strict=True):
+            for relative_path, path in zip(selected_paths, files, strict=True):
                 try:
                     current = path.stat()
                 except OSError:
@@ -426,6 +486,33 @@ class NotificationApp:
                 )
                 self.store.save(self.state)
             LOG.info("Upload %s completed", upload["upload_id"])
+
+    def _recording_duration(self, path: Path) -> float:
+        result = self.run_command(
+            [
+                str(self.ffprobe),
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise ValueError("ffprobe could not determine recording duration")
+        try:
+            duration = float(json.loads(result.stdout)["format"]["duration"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("recording duration is unavailable") from error
+        if not math.isfinite(duration) or duration < 0:
+            raise ValueError("recording duration is invalid")
+        return duration
 
     def _resolve_recordings(self, paths: list[str]) -> list[Path]:
         if self.recording_root is None:
@@ -605,13 +692,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recording-root", type=Path)
     parser.add_argument("--upload-line", default="alia")
     parser.add_argument("--upload-metadata", type=Path)
+    parser.add_argument("--ffprobe", type=Path)
+    parser.add_argument("--minimum-upload-duration", type=float, default=0)
     parser.add_argument("--listen", default="127.0.0.1")
     parser.add_argument("--port", default=22357, type=int)
     return parser.parse_args()
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     args = parse_args()
     upload_title = "{name} 直播回放 {title} {date}"
     upload_description = (
@@ -635,10 +726,14 @@ def main() -> None:
         upload_title=upload_title,
         upload_description=upload_description,
         upload_tags=upload_tags,
+        ffprobe=args.ffprobe,
+        minimum_upload_duration=args.minimum_upload_duration,
     )
     WebhookHandler.app = app
     server = ThreadingHTTPServer((args.listen, args.port), WebhookHandler)
-    worker = threading.Thread(target=app.run_worker, name="notification-outbox", daemon=True)
+    worker = threading.Thread(
+        target=app.run_worker, name="notification-outbox", daemon=True
+    )
     worker.start()
 
     def stop(_signum: int, _frame: Any) -> None:
