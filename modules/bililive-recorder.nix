@@ -63,7 +63,17 @@ let
         };
         FlvProcessorSplitOnScriptTag = {
           HasValue = true;
-          Value = true;
+          Value = cfg.splitOnScriptTag;
+        };
+        UserScript = {
+          HasValue = true;
+          Value =
+            if cfg.cdnPriority == [ ] then
+              ""
+            else
+              builtins.replaceStrings [ "__CDN_PRIORITY__" ] [ (builtins.toJSON cfg.cdnPriority) ] (
+                builtins.readFile ../packages/bililive-recorder-cdn.js
+              );
         };
         NetworkTransportAllowedAddressFamily = {
           HasValue = true;
@@ -142,7 +152,12 @@ let
           (.name | type == "string") and (.value | type == "string")
         ) | "\(.name)=\(.value)"] | if length > 0 then join("; ") else error("empty cookie set") end' \
         "$CREDENTIALS_DIRECTORY/cookies.json")
-      jq --arg cookie "$cookie" '.global.Cookie.Value = $cookie' \
+      jq --arg cookie "$cookie" '
+        .global.Cookie.Value = $cookie |
+        if .global.UserScript.Value != "" then
+          .global.UserScript.Value = ("const recorderCookie = " + ($cookie | tojson) + ";\n" + .global.UserScript.Value)
+        else . end
+      ' \
         ${recorderConfig} > "$RUNTIME_DIRECTORY/config.json.new"
       chmod 0600 "$RUNTIME_DIRECTORY/config.json.new"
       mv "$RUNTIME_DIRECTORY/config.json.new" "$RUNTIME_DIRECTORY/config.json"
@@ -241,6 +256,24 @@ in
       type = lib.types.bool;
       default = false;
       description = "Upload completed sessions to Bilibili as private videos.";
+    };
+
+    cdnPriority = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[a-z0-9-]+");
+      default = [ ];
+      description = "Preferred Bilibili CDN IDs in order; recent reconnects cool down the previous CDN for five minutes. Empty uses recorder defaults.";
+    };
+
+    splitOnScriptTag = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Split recording files when FLV Script Tags suggest missing data.";
+    };
+
+    minimumUploadDuration = lib.mkOption {
+      type = lib.types.ints.unsigned;
+      default = 0;
+      description = "Minimum segment duration in seconds for Bilibili submission; shorter originals remain available for backup.";
     };
 
     uploadTitle = lib.mkOption {
@@ -502,10 +535,15 @@ in
             "--upload-line alia"
             "--upload-metadata ${uploadMetadata}"
           ]
+          ++ lib.optionals (cfg.upload && cfg.minimumUploadDuration > 0) [
+            "--minimum-upload-duration ${toString cfg.minimumUploadDuration}"
+          ]
+          ++ lib.optionals ((cfg.upload && cfg.minimumUploadDuration > 0) || cfg.danmaku.roomIds != [ ]) [
+            "--ffprobe ${pkgs.ffmpeg-headless}/bin/ffprobe"
+          ]
           ++ lib.optionals (cfg.danmaku.roomIds != [ ]) [
             "--danmaku-factory ${danmakuFactory}/bin/DanmakuFactory"
             "--ffmpeg ${pkgs.ffmpeg-headless}/bin/ffmpeg"
-            "--ffprobe ${pkgs.ffmpeg-headless}/bin/ffprobe"
             "--fonts-directory ${danmakuFonts}"
           ]
         );

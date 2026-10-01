@@ -30,6 +30,117 @@ def event(event_type, event_id, **data):
 
 
 class BililiveRecorderNotifierTests(unittest.TestCase):
+    def filtered_upload(
+        self, temporary, durations, probe_error=False, upload_error=False
+    ):
+        root = Path(temporary) / "recordings"
+        root.mkdir()
+        for name in durations:
+            (root / name).write_bytes(b"original recording")
+        calls = []
+
+        def run(command, **options):
+            calls.append(command)
+            if command[0] == "/bin/ffprobe":
+                return types.SimpleNamespace(
+                    returncode=int(probe_error),
+                    stdout=json.dumps(
+                        {"format": {"duration": durations[Path(command[-1]).name]}}
+                    ),
+                )
+            return types.SimpleNamespace(returncode=int(upload_error))
+
+        app = notifier.NotificationApp(
+            node="edge-a",
+            room_ids=[12345],
+            ntfy_server="https://ntfy.example",
+            ntfy_topic="inbox",
+            store=notifier.StateStore(Path(temporary) / "state.json"),
+            uploader=Path("/bin/biliup"),
+            uploader_cookie=Path("/run/cookies.json"),
+            recording_root=root,
+            ffprobe=Path("/bin/ffprobe"),
+            minimum_upload_duration=10,
+            run_command=run,
+            wall_time=lambda: 1000,
+        )
+        app.state["uploads"]["test-upload"] = {
+            "upload_id": "test-upload",
+            "name": "Streamer",
+            "title": "Live",
+            "room_id": 12345,
+            "started_at": "2026-10-01T00:00:00+08:00",
+            "paths": list(durations),
+            "attempts": 0,
+            "next_attempt_at": 0,
+        }
+        app.flush_uploads()
+        return app, calls, root
+
+    def test_short_parts_are_retained_and_not_marked_uploaded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app, calls, root = self.filtered_upload(
+                temporary,
+                {"short.flv": "0.789", "boundary.flv": "10", "long.flv": "3600"},
+            )
+            uploads = [c for c in calls if c[0] == "/bin/biliup"]
+            self.assertEqual(len(uploads), 1)
+            self.assertEqual(
+                uploads[0][-2:], [str(root / "boundary.flv"), str(root / "long.flv")]
+            )
+            self.assertTrue((root / "short.flv").is_file())
+            self.assertEqual(
+                set(app.state["completed_uploads"]["test-upload"]["files"]),
+                {"boundary.flv", "long.flv"},
+            )
+            self.assertEqual(
+                set(app.state["skipped_uploads"]["test-upload"]["files"]), {"short.flv"}
+            )
+            self.assertEqual(app.state["uploads"], {})
+
+    def test_all_short_parts_finish_without_submission_or_retry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app, calls, root = self.filtered_upload(temporary, {"short.flv": "5.678"})
+            self.assertFalse(any(c[0] == "/bin/biliup" for c in calls))
+            self.assertEqual(app.state["uploads"], {})
+            self.assertEqual(app.state["completed_uploads"], {})
+            self.assertIn("test-upload-skipped", app.state["outbox"])
+            self.assertTrue((root / "short.flv").is_file())
+            loaded = app.store.load()
+            self.assertEqual(loaded["uploads"], {})
+            self.assertIn("test-upload", loaded["skipped_uploads"])
+
+    def test_probe_failure_preserves_queue_and_original(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app, calls, root = self.filtered_upload(
+                temporary, {"part.flv": "10"}, probe_error=True
+            )
+            self.assertEqual(app.state["uploads"]["test-upload"]["attempts"], 1)
+            self.assertFalse(any(c[0] == "/bin/biliup" for c in calls))
+            self.assertTrue((root / "part.flv").is_file())
+
+    def test_unknown_duration_is_not_treated_as_short(self):
+        for duration in ("N/A", "NaN", "Infinity", "-1"):
+            with (
+                self.subTest(duration=duration),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                app, calls, root = self.filtered_upload(
+                    temporary, {"part.flv": duration}
+                )
+                self.assertIn("test-upload", app.state["uploads"])
+                self.assertEqual(app.state["skipped_uploads"], {})
+                self.assertFalse(any(c[0] == "/bin/biliup" for c in calls))
+
+    def test_submission_failure_does_not_mark_long_parts_completed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app, calls, root = self.filtered_upload(
+                temporary, {"short.flv": "3", "long.flv": "600"}, upload_error=True
+            )
+            self.assertIn("test-upload", app.state["uploads"])
+            self.assertEqual(app.state["completed_uploads"], {})
+            self.assertEqual(len(list(root.iterdir())), 2)
+
     def make_app(self, path, clock):
         return notifier.NotificationApp(
             node="edge-a",
@@ -146,12 +257,8 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
                 wall_time=lambda: clock[0],
             )
             app.handle_event(event("SessionStarted", "start-event"))
-            app.handle_event(
-                event("FileClosed", "file-1", RelativePath="part-1.flv")
-            )
-            app.handle_event(
-                event("FileClosed", "file-2", RelativePath="part-2.flv")
-            )
+            app.handle_event(event("FileClosed", "file-1", RelativePath="part-1.flv"))
+            app.handle_event(event("FileClosed", "file-2", RelativePath="part-2.flv"))
             app.handle_event(event("SessionEnded", "end-event"))
             clock[0] += notifier.UPLOAD_GRACE_SECONDS
 
@@ -209,7 +316,12 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
 
             app.handle_event(event("SessionStarted", "start-1", SessionId="session-1"))
             app.handle_event(
-                event("FileClosed", "file-1", SessionId="session-1", RelativePath="part-1.flv")
+                event(
+                    "FileClosed",
+                    "file-1",
+                    SessionId="session-1",
+                    RelativePath="part-1.flv",
+                )
             )
             clock[0] = 110.0
             app.handle_event(event("SessionEnded", "end-1", SessionId="session-1"))
@@ -217,7 +329,12 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
             clock[0] = 111.0
             app.handle_event(event("SessionStarted", "start-2", SessionId="session-2"))
             app.handle_event(
-                event("FileClosed", "file-2", SessionId="session-2", RelativePath="part-2.flv")
+                event(
+                    "FileClosed",
+                    "file-2",
+                    SessionId="session-2",
+                    RelativePath="part-2.flv",
+                )
             )
             clock[0] = 120.0
             app.handle_event(event("SessionEnded", "end-2", SessionId="session-2"))
@@ -265,7 +382,9 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
                 uploader=Path("/bin/biliup"),
                 uploader_cookie=Path("/run/cookies.json"),
                 recording_root=root,
-                run_command=lambda command, **options: types.SimpleNamespace(returncode=0),
+                run_command=lambda command, **options: types.SimpleNamespace(
+                    returncode=0
+                ),
                 wall_time=lambda: clock[0],
             )
 
@@ -275,10 +394,20 @@ class BililiveRecorderNotifierTests(unittest.TestCase):
             clock[0] = 111.0
             app.handle_event(event("SessionStarted", "start-2", SessionId="session-2"))
             app.handle_event(
-                event("FileClosed", "late-file-1", SessionId="session-1", RelativePath="part-1.flv")
+                event(
+                    "FileClosed",
+                    "late-file-1",
+                    SessionId="session-1",
+                    RelativePath="part-1.flv",
+                )
             )
             app.handle_event(
-                event("FileClosed", "file-2", SessionId="session-2", RelativePath="part-2.flv")
+                event(
+                    "FileClosed",
+                    "file-2",
+                    SessionId="session-2",
+                    RelativePath="part-2.flv",
+                )
             )
             self.assertNotIn("session-1", app.state["sessions"])
             self.assertEqual(app.state["sessions"]["session-2"]["files"], 2)

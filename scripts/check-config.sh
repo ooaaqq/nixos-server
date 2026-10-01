@@ -14,4 +14,6 @@ nixfmt --check "${nix_files[@]}"
 PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" \
   python3 -m unittest discover -s "$root/tests" -p 'test_*.py'
 
+node --test "$root/tests/test_bililive_recorder_cdn.cjs"
+
 nix flake check --no-build --accept-flake-config "git+file://$root"
