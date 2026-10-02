@@ -1,6 +1,7 @@
 {
   imports = [
     ./bilibili-live-helper.nix
+    ./eop-milky.nix
     ./bililive-recorder.nix
     ./astrbot.nix
     ./minecraft-forge.nix
