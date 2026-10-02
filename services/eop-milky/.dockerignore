@@ -1,0 +1,8 @@
+node_modules
+build
+state
+.env
+*.sqlite*
+config.json
+config.eop.js
+tests
