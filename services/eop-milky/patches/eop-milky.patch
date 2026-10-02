@@ -1,0 +1,92 @@
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -15,14 +15,15 @@
+
+ import pkg from '../package.json' with { type: 'json' }
+ import TelegramBot from './senders/telegram'
+-import { renderAll } from './senders/telegram-renderer'
++import { databasePath } from './compat/paths'
++import { createMilkyAdapter, refreshBilibiliCookie } from './compat/milky-adapter'
+ import { services } from './services'
+ import rssExtract, { normalizeRsshubJson } from './services/rssExtract'
+ import { extractImage, formatDate, stripHtml, textTruncate } from './utils'
+ import { bilibiliWbi } from './utils/bilibiliWbi'
+ import cookieCloud from './utils/cookieCloud'
+ import { cryptoHash } from './utils/crypto'
+-import { importFromJson, loadScope, openDb, persistScope } from './utils/db'
++import { loadScope, persistScope } from './utils/db'
+ import { deepMerge } from './utils/deepMerge'
+ import { generateMobileUa, generateUa } from './utils/generateUa'
+ import { readProcessedMedia } from './utils/processMedia'
+@@ -129,6 +130,7 @@
+
+ // Merge default configs and user configs
+ const config = await generateConfig()
++const milky = createMilkyAdapter(config, !!argv.once)
+ // const userConfig = argv.config ? JSON.parse(fs.readFileSync(argv.config)) : {};
+
+ // Used by extractor-douyin
+@@ -180,6 +182,7 @@
+
+   const uaDesktop = generateUa()
+   const uaMobile = generateMobileUa()
++  await refreshBilibiliCookie()
+   const cookies = await cookieCloud()
+   const wbiKeys = await bilibiliWbi()
+
+@@ -298,8 +301,7 @@
+       for (const service of services) {
+         if (!service.gate(ctx)) continue
+         try {
+-          const notifications = await service.run(ctx)
+-          await renderAll(ctx, notifications)
++          await milky.runService(ctx, service, db, dbScope, dbGlobal)
+         } catch (e) {
+           err(`service ${service.name} error`, e)
+         }
+@@ -662,26 +664,25 @@
+ }
+
+ if (argv._.includes('run')) {
+-  // Open SQLite once for the whole process; import legacy db.json on first run
+-  // (no-op once the entries table is populated, or if db.json is absent).
+-  const db = openDb(path.join(path.resolve(), 'db/db.sqlite'))
+-  importFromJson(db, path.join(path.resolve(), 'db/db.json'))
+-
+-  // Output configs for reference
+-  argv.verbose && console.log('Current configs', config)
+-
+-  // Execute on run
+-  await main(config, db)
+-
+-  if (!argv.once) {
+-    // Loop over interval — wait loopInterval, run main() to completion, repeat.
+-    // Replaces set-interval-async/fixed: guarantees no overlapping runs and a
+-    // fixed gap between the end of one run and the start of the next.
+-    while (true) {
+-      await setTimeout(config.loopInterval)
+-      argv.verbose && console.log('interval started')
+-      await main(config, db)
+-      argv.verbose && console.log('interval ended')
++  // The Milky adapter owns its fresh database and transactional outbox.
++  const db = milky.openDatabase(databasePath())
++  try {
++    argv.verbose && console.log('Current configs', config)
++    milky.start()
++    await main(config, db)
++
++    // Wait after each completed poll; the adapter's pause responds to shutdown.
++    if (!argv.once) {
++      while (!milky.stopping) {
++        await milky.pause(config.loopInterval)
++        if (milky.stopping) break
++        argv.verbose && console.log('interval started')
++        await main(config, db)
++        argv.verbose && console.log('interval ended')
++      }
+     }
++  } finally {
++    try { await milky.finish() }
++    finally { db.close() }
+   }
+ }
