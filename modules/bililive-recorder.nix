@@ -7,7 +7,8 @@
 
 let
   cfg = config.ssvgg.bililiveRecorder;
-  credentials = config.sops.secrets."bilibili/cookies";
+  recordingCredentials = config.sops.secrets."bilibili/recording-cookies";
+  uploadCredentials = config.sops.secrets."bilibili/upload-cookies";
   biliup = pkgs.callPackage ../packages/biliup.nix { };
   danmakuFactory = pkgs.callPackage ../packages/danmaku-factory.nix { };
   monochromeEmojiFont = pkgs.callPackage ../packages/noto-emoji-mono.nix { };
@@ -247,9 +248,14 @@ in
       description = "Short node label included in notifications.";
     };
 
-    credentialFile = lib.mkOption {
+    recordingCredentialFile = lib.mkOption {
       type = lib.types.path;
-      description = "SOPS file containing the shared biliup cookies.json document.";
+      description = "SOPS file containing the Bilibili cookies used by the recorder and live CDN helper.";
+    };
+
+    uploadCredentialFile = lib.mkOption {
+      type = lib.types.path;
+      description = "SOPS file containing the Biliup uploader cookies.json document.";
     };
 
     upload = lib.mkOption {
@@ -502,13 +508,17 @@ in
       group = "bililive-recorder";
     };
 
-    sops.secrets."bilibili/cookies" = {
-      sopsFile = cfg.credentialFile;
+    sops.secrets."bilibili/recording-cookies" = {
+      sopsFile = cfg.recordingCredentialFile;
       key = "data";
       restartUnits = [
         "bililive-recorder.service"
-        "bililive-recorder-notifier.service"
       ];
+    };
+    sops.secrets."bilibili/upload-cookies" = {
+      sopsFile = cfg.uploadCredentialFile;
+      key = "data";
+      restartUnits = [ "bililive-recorder-notifier.service" ];
     };
 
     systemd.services.bililive-recorder-notifier = {
@@ -547,7 +557,7 @@ in
             "--fonts-directory ${danmakuFonts}"
           ]
         );
-        LoadCredential = lib.mkIf cfg.upload "cookies.json:${credentials.path}";
+        LoadCredential = lib.mkIf cfg.upload "cookies.json:${uploadCredentials.path}";
         ExecStartPre = lib.mkIf cfg.upload "${prepareUploaderCredential}/bin/bililive-recorder-prepare-uploader-credential";
         Environment =
           lib.optionals cfg.upload [ "XDG_DATA_HOME=/var/lib/bililive-recorder-notifier" ]
@@ -599,7 +609,7 @@ in
       ];
       serviceConfig = {
         Type = "exec";
-        LoadCredential = "cookies.json:${credentials.path}";
+        LoadCredential = "cookies.json:${recordingCredentials.path}";
         Environment = "BILILIVERECORDER_LOG_FILE_PATH=/var/lib/bililive-recorder/logs/bilirec.txt";
         ExecStartPre = "${prepareConfig}/bin/bililive-recorder-prepare-config";
         ExecStart = "${pkgs.bililiverecorder}/bin/BililiveRecorder run /var/lib/bililive-recorder/recordings --config-override /run/bililive-recorder/config.json --http-bind http://127.0.0.1:22356";
