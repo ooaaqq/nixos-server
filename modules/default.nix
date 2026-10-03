@@ -4,7 +4,6 @@
     ./eop-milky.nix
     ./bililive-recorder.nix
     ./astrbot.nix
-    ./minecraft-forge.nix
     ./ntfy.nix
     ./ss2022.nix
     ./sub2api.nix
