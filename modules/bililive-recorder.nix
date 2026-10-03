@@ -254,7 +254,8 @@ in
     };
 
     uploadCredentialFile = lib.mkOption {
-      type = lib.types.path;
+      type = lib.types.nullOr lib.types.path;
+      default = null;
       description = "SOPS file containing the Biliup uploader cookies.json document.";
     };
 
@@ -515,10 +516,12 @@ in
         "bililive-recorder.service"
       ];
     };
-    sops.secrets."bilibili/upload-cookies" = {
-      sopsFile = cfg.uploadCredentialFile;
-      key = "data";
-      restartUnits = [ "bililive-recorder-notifier.service" ];
+    sops.secrets = lib.mkIf cfg.upload {
+      "bilibili/upload-cookies" = {
+        sopsFile = cfg.uploadCredentialFile;
+        key = "data";
+        restartUnits = [ "bililive-recorder-notifier.service" ];
+      };
     };
 
     systemd.services.bililive-recorder-notifier = {
