@@ -48,27 +48,17 @@ in
           ++ lib.optionals (cfg.upload && cfg.minimumUploadDuration > 0) [
             "--minimum-upload-duration ${toString cfg.minimumUploadDuration}"
           ]
-          ++ lib.optionals ((cfg.upload && cfg.minimumUploadDuration > 0) || cfg.danmaku.roomIds != [ ]) [
+          ++ lib.optionals (cfg.upload && cfg.minimumUploadDuration > 0) [
             "--ffprobe ${pkgs.ffmpeg-headless}/bin/ffprobe"
-          ]
-          ++ lib.optionals (cfg.danmaku.roomIds != [ ]) [
-            "--danmaku-factory ${common.danmakuFactory}/bin/DanmakuFactory"
-            "--ffmpeg ${pkgs.ffmpeg-headless}/bin/ffmpeg"
-            "--fonts-directory ${common.danmakuFonts}"
           ]
         );
         LoadCredential = lib.mkIf cfg.upload "cookies.json:${common.uploadCredentials.path}";
         ExecStartPre = lib.mkIf cfg.upload "${common.prepareUploaderCredential}/bin/bililive-recorder-prepare-uploader-credential";
-        Environment =
-          lib.optionals cfg.upload [ "XDG_DATA_HOME=/var/lib/bililive-recorder-notifier" ]
-          ++ lib.optionals (cfg.danmaku.roomIds != [ ]) [
-            "FONTCONFIG_FILE=${common.fontconfigFile}"
-            "XDG_CACHE_HOME=/var/lib/bililive-recorder-notifier/font-cache"
-          ];
-        WorkingDirectory = lib.mkIf cfg.upload "/var/lib/bililive-recorder-notifier";
-        ReadWritePaths = lib.optionals (cfg.danmaku.roomIds != [ ]) [
-          "/var/lib/bililive-recorder/recordings"
+        Environment = lib.optionals cfg.upload [
+          "XDG_DATA_HOME=/var/lib/bililive-recorder-notifier"
         ];
+        WorkingDirectory = lib.mkIf cfg.upload "/var/lib/bililive-recorder-notifier";
+        ReadWritePaths = [ "/var/lib/bililive-recorder/recordings" ];
         User = "bililive-recorder";
         Group = "bililive-recorder";
         StateDirectory = "bililive-recorder-notifier";

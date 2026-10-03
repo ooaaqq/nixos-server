@@ -4,12 +4,12 @@
   ...
 }:
 let
-  cfg = config.ssvgg.llonebot;
+  cfg = config.ssvgg.llbot;
   pmhqEnvironmentFiles = lib.optional (cfg.pmhqEnvironmentFile != null) cfg.pmhqEnvironmentFile;
 in
 {
-  options.ssvgg.llonebot = {
-    enable = lib.mkEnableOption "LLOneBot with PMHQ";
+  options.ssvgg.llbot = {
+    enable = lib.mkEnableOption "LLBot with PMHQ";
     llbotImage = lib.mkOption {
       type = lib.types.str;
       default = "docker.io/linyuchen/llbot:8.2.1";
@@ -24,7 +24,7 @@ in
     };
     dataDirectory = lib.mkOption {
       type = lib.types.path;
-      default = "/var/lib/llonebot";
+      default = "/var/lib/llbot";
     };
     pmhqEnvironmentFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
@@ -88,15 +88,15 @@ in
       ];
     };
 
-    users.groups.llonebot = { };
-    users.users.llonebot = {
+    users.groups.llbot = { };
+    users.users.llbot = {
       isSystemUser = true;
-      group = "llonebot";
+      group = "llbot";
     };
     systemd.tmpfiles.rules = [
-      "d ${cfg.dataDirectory} 0750 llonebot llonebot -"
-      "d ${cfg.dataDirectory}/pmhq 0700 llonebot llonebot -"
-      "d ${cfg.dataDirectory}/llbot 0700 llonebot llonebot -"
+      "d ${cfg.dataDirectory} 0750 llbot llbot -"
+      "d ${cfg.dataDirectory}/pmhq 0700 llbot llbot -"
+      "d ${cfg.dataDirectory}/llbot 0700 llbot llbot -"
     ];
     systemd.services.podman-pmhq = {
       wants = [ "network-online.target" ];

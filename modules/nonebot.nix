@@ -5,7 +5,7 @@
   ...
 }:
 let
-  cfg = config.ssvgg.qqBot;
+  cfg = config.ssvgg.nonebot;
   hasMain = cfg.mainProject != null;
   playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.63.nix { };
   packagedProject =
@@ -13,13 +13,13 @@ let
     if project == null then
       null
     else
-      pkgs.runCommandLocal "qq-bot-project" { } ''
+      pkgs.runCommandLocal "nonebot-project" { } ''
         mkdir -p "$out"
         cp -r ${project}/. "$out/"
       '';
   mainProject = packagedProject cfg.mainProject;
 
-  startMain = pkgs.writeShellScript "qq-bot-main-start" ''
+  startMain = pkgs.writeShellScript "nonebot-main-start" ''
     set -euo pipefail
     token="$(${pkgs.coreutils}/bin/printenv ${lib.escapeShellArg cfg.milkyTokenEnvironmentVariable} || true)"
     export MILKY_CLIENTS="$(${pkgs.jq}/bin/jq -cn \
@@ -40,7 +40,7 @@ let
     ];
     PLAYWRIGHT_NODEJS_PATH = "${pkgs.nodejs}/bin/node";
     PLAYWRIGHT_BROWSERS_PATH = playwrightBrowsers;
-    UV_CACHE_DIR = "/var/cache/qq-bot/uv";
+    UV_CACHE_DIR = "/var/cache/nonebot/uv";
     UV_NO_MANAGED_PYTHON = "1";
     UV_PYTHON = "${pkgs.python314}/bin/python3";
   };
@@ -53,18 +53,18 @@ let
 
   mainEnvironment = commonEnvironment // {
     DRIVER = "~fastapi+~httpx+~websockets";
-    HOME = "/var/lib/qq-bot/main";
-    LOCALSTORE_CACHE_DIR = "/var/cache/qq-bot/main";
-    LOCALSTORE_CONFIG_DIR = "/var/lib/qq-bot/main/config";
-    LOCALSTORE_DATA_DIR = "/var/lib/qq-bot/main/data";
-    UV_PROJECT_ENVIRONMENT = "/var/lib/qq-bot/main/venv";
+    HOME = "/var/lib/nonebot/main";
+    LOCALSTORE_CACHE_DIR = "/var/cache/nonebot/main";
+    LOCALSTORE_CONFIG_DIR = "/var/lib/nonebot/main/config";
+    LOCALSTORE_DATA_DIR = "/var/lib/nonebot/main/data";
+    UV_PROJECT_ENVIRONMENT = "/var/lib/nonebot/main/venv";
   };
 
   runtimeConfigSetup = runtimeConfig: exampleConfig: extra: ''
-    ${pkgs.coreutils}/bin/install -d -o qq-bot -g qq-bot -m 0700 "$(dirname ${lib.escapeShellArg runtimeConfig})"
+    ${pkgs.coreutils}/bin/install -d -o nonebot -g nonebot -m 0700 "$(dirname ${lib.escapeShellArg runtimeConfig})"
     ${lib.optionalString (exampleConfig != null) ''
       if [ ! -s ${lib.escapeShellArg runtimeConfig} ] && [ -f ${lib.escapeShellArg exampleConfig} ]; then
-        ${pkgs.coreutils}/bin/install -o qq-bot -g qq-bot -m 0640 \
+        ${pkgs.coreutils}/bin/install -o nonebot -g nonebot -m 0640 \
           ${lib.escapeShellArg exampleConfig} ${lib.escapeShellArg runtimeConfig}
       fi
     ''}
@@ -72,8 +72,8 @@ let
   '';
 in
 {
-  options.ssvgg.qqBot = {
-    enable = lib.mkEnableOption "NoneBot QQ bot instances connected to LLBot";
+  options.ssvgg.nonebot = {
+    enable = lib.mkEnableOption "NoneBot main application connected to LLBot";
     milkyHost = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1";
@@ -96,7 +96,7 @@ in
     };
     mainRuntimeConfigFile = lib.mkOption {
       type = lib.types.path;
-      default = "/var/lib/qq-bot/main/config/nonebot.env";
+      default = "/var/lib/nonebot/main/config/nonebot.env";
       description = "Mutable live configuration for the Milky instance; deployments do not overwrite it.";
     };
     mainRuntimeConfigSeedFile = lib.mkOption {
@@ -115,28 +115,28 @@ in
     assertions = [
       {
         assertion = hasMain;
-        message = "ssvgg.qqBot requires mainProject";
+        message = "ssvgg.nonebot requires mainProject";
       }
     ];
 
-    users.groups.qq-bot = lib.mkIf hasMain { };
-    users.users.qq-bot = lib.mkIf hasMain {
+    users.groups.nonebot = lib.mkIf hasMain { };
+    users.users.nonebot = lib.mkIf hasMain {
       isSystemUser = true;
-      group = "qq-bot";
+      group = "nonebot";
     };
 
     systemd.tmpfiles.rules = lib.optionals hasMain [
-      "d /var/cache/qq-bot 0755 qq-bot qq-bot -"
-      "d /var/cache/qq-bot/uv 0750 qq-bot qq-bot -"
-      "d /var/cache/qq-bot/main 0750 qq-bot qq-bot -"
-      "d /var/lib/qq-bot/main 0700 qq-bot qq-bot -"
-      "d /var/lib/qq-bot/main/config 0700 qq-bot qq-bot -"
-      "f ${cfg.mainRuntimeConfigFile} 0640 qq-bot qq-bot -"
-      "d /var/lib/qq-bot/main/data 0700 qq-bot qq-bot -"
+      "d /var/cache/nonebot 0755 nonebot nonebot -"
+      "d /var/cache/nonebot/uv 0750 nonebot nonebot -"
+      "d /var/cache/nonebot/main 0750 nonebot nonebot -"
+      "d /var/lib/nonebot/main 0700 nonebot nonebot -"
+      "d /var/lib/nonebot/main/config 0700 nonebot nonebot -"
+      "f ${cfg.mainRuntimeConfigFile} 0640 nonebot nonebot -"
+      "d /var/lib/nonebot/main/data 0700 nonebot nonebot -"
     ];
 
-    systemd.services.qq-bot = lib.mkIf hasMain {
-      description = "NoneBot QQ bot (Milky)";
+    systemd.services.nonebot = lib.mkIf hasMain {
+      description = "NoneBot main application (Milky)";
       wantedBy = [ "multi-user.target" ];
       wants = [
         "network-online.target"
@@ -151,7 +151,7 @@ in
       };
       path = commonPath;
       preStart = runtimeConfigSetup cfg.mainRuntimeConfigFile cfg.mainRuntimeConfigSeedFile ''
-        parser_cache=/var/cache/qq-bot/main/nonebot_plugin_parser_lite
+        parser_cache=/var/cache/nonebot/main/nonebot_plugin_parser_lite
         if [ -d "$parser_cache" ]; then
           ${pkgs.findutils}/bin/find "$parser_cache" -type d -exec ${pkgs.coreutils}/bin/chmod 0755 {} +
           ${pkgs.findutils}/bin/find "$parser_cache" -type f -exec ${pkgs.coreutils}/bin/chmod 0644 {} +
@@ -161,8 +161,8 @@ in
         fi
       '';
       serviceConfig = {
-        User = "qq-bot";
-        Group = "qq-bot";
+        User = "nonebot";
+        Group = "nonebot";
         EnvironmentFile = [ cfg.mainRuntimeConfigFile ];
         WorkingDirectory = mainProject;
         ExecStart = startMain;

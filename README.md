@@ -45,7 +45,7 @@ leave obsolete settings behind.
 For LLBot, this module starts PMHQ and LLBot and provides their persistent data
 directories. Protocol listeners and connector entries are managed in the
 LLBot WebUI. The caller documents the expected local endpoints for dependent
-services and checks those links independently. `ssvgg.llonebot.webuiPort` is
+services and checks those links independently. `ssvgg.llbot.webuiPort` is
 retained as the stable WebUI endpoint for SSH tunnels and health checks.
 
 The ntfy module keeps the `inbox` anonymous read/write ACL in the NixOS ntfy
