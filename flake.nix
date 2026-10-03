@@ -6,16 +6,11 @@
     url = "github:Mic92/sops-nix";
     inputs.nixpkgs.follows = "nixpkgs";
   };
-  inputs.i915-sriov-dkms = {
-    url = "github:strongtz/i915-sriov-dkms/2026.09.16";
-    inputs.nixpkgs.follows = "nixpkgs";
-  };
 
   outputs =
     {
       nixpkgs,
       sops-nix,
-      i915-sriov-dkms,
       ...
     }:
     let
@@ -27,34 +22,12 @@
         astrbot = ./modules/astrbot.nix;
         bilibili-live-helper = ./modules/bilibili-live-helper.nix;
         bililive-recorder = ./modules/bililive-recorder.nix;
-        minecraft-forge = ./modules/minecraft-forge.nix;
         ntfy = ./modules/ntfy.nix;
         ss2022 = ./modules/ss2022.nix;
         sub2api = ./modules/sub2api.nix;
         web = ./modules/web.nix;
         nonebot = ./modules/nonebot.nix;
         llbot = ./modules/llbot.nix;
-        i915-sriov =
-          { config, ... }:
-          {
-            imports = [ i915-sriov-dkms.nixosModules.default ];
-            options.ssvgg.i915Sriov = {
-              enable = lib.mkEnableOption "patched Intel i915 SR-IOV driver";
-              deviceId = lib.mkOption {
-                type = lib.types.str;
-                default = "a7a0";
-              };
-            };
-            config = lib.mkIf config.ssvgg.i915Sriov.enable {
-              boot.kernelModules = [ "i915" ];
-              boot.kernelParams = [
-                "intel_iommu=on"
-                "i915.enable_guc=3"
-                "i915.force_probe=${config.ssvgg.i915Sriov.deviceId}"
-                "module_blacklist=xe"
-              ];
-            };
-          };
       };
       example = nixpkgs.lib.nixosSystem {
         inherit system;
