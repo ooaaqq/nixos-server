@@ -1,7 +1,15 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.ssvgg.bililiveRecorder;
-  common = import ./bililive-recorder-common.nix { inherit config lib pkgs; recorderCfg = cfg; };
+  common = import ./bililive-recorder-common.nix {
+    inherit config lib pkgs;
+    recorderCfg = cfg;
+  };
 in
 {
   config = lib.mkIf cfg.enable {

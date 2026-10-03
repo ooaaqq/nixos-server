@@ -1,4 +1,9 @@
-{ config, lib, pkgs, recorderCfg }:
+{
+  config,
+  lib,
+  pkgs,
+  recorderCfg,
+}:
 let
   cfg = recorderCfg;
   recordingCredentials = config.sops.secrets."bilibili/recording-cookies";
@@ -228,5 +233,18 @@ let
   notifierScript = ../packages/bililive-recorder-notifier.py;
 in
 {
-  inherit recordingCredentials uploadCredentials biliup danmakuFactory danmakuFonts fontconfigFile recorderConfig uploadMetadata prepareConfig prepareUploaderCredential cleanup notifierScript;
+  inherit
+    recordingCredentials
+    uploadCredentials
+    biliup
+    danmakuFactory
+    danmakuFonts
+    fontconfigFile
+    recorderConfig
+    uploadMetadata
+    prepareConfig
+    prepareUploaderCredential
+    cleanup
+    notifierScript
+    ;
 }
