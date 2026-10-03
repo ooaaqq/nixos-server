@@ -29,12 +29,11 @@
         bililive-recorder = ./modules/bililive-recorder.nix;
         minecraft-forge = ./modules/minecraft-forge.nix;
         ntfy = ./modules/ntfy.nix;
-        harp-web = ./modules/harp-web.nix;
         ss2022 = ./modules/ss2022.nix;
         sub2api = ./modules/sub2api.nix;
         web = ./modules/web.nix;
-        qq-bot = ./modules/qq-bot.nix;
-        llonebot = ./modules/llonebot.nix;
+        nonebot = ./modules/nonebot.nix;
+        llbot = ./modules/llbot.nix;
         i915-sriov =
           { config, ... }:
           {
@@ -67,7 +66,7 @@
             networking.hostName = "nixos-server-example";
             ssvgg.astrbot.enable = true;
             ssvgg.web.enable = true;
-            ssvgg.llonebot.enable = true;
+            ssvgg.llbot.enable = true;
             ssvgg.ntfy = {
               enable = true;
               domain = "ntfy.example.com";
@@ -83,15 +82,11 @@
 
       packages.${system} = {
         biliup = pkgs.callPackage ./packages/biliup.nix { };
-        danmaku-factory = pkgs.callPackage ./packages/danmaku-factory.nix { };
-        noto-emoji-mono = pkgs.callPackage ./packages/noto-emoji-mono.nix { };
         playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
       };
       checks.${system} = {
         example = example.config.system.build.toplevel;
         biliup = pkgs.callPackage ./packages/biliup.nix { };
-        danmaku-factory = pkgs.callPackage ./packages/danmaku-factory.nix { };
-        noto-emoji-mono = pkgs.callPackage ./packages/noto-emoji-mono.nix { };
         playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
       };
 

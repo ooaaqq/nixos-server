@@ -9,18 +9,6 @@ let
   recordingCredentials = config.sops.secrets."bilibili/recording-cookies";
   uploadCredentials = config.sops.secrets."bilibili/upload-cookies";
   biliup = pkgs.callPackage ../packages/biliup.nix { };
-  danmakuFactory = pkgs.callPackage ../packages/danmaku-factory.nix { };
-  monochromeEmojiFont = pkgs.callPackage ../packages/noto-emoji-mono.nix { };
-  danmakuFonts = pkgs.runCommand "bililive-recorder-danmaku-fonts" { } ''
-    mkdir -p "$out"
-    ln -s "${pkgs.noto-fonts-cjk-sans}/share/fonts/opentype/noto-cjk/NotoSansCJK-VF.otf.ttc" \
-      "$out/NotoSansCJK-VF.otf.ttc"
-    ln -s "${monochromeEmojiFont}/share/fonts/opentype/noto/NotoEmoji.otf" \
-      "$out/NotoEmoji.otf"
-  '';
-  fontconfigFile = pkgs.makeFontsConf {
-    fontDirectories = [ danmakuFonts ];
-  };
   recorderConfig = pkgs.writeText "bililive-recorder-config.json" (
     builtins.toJSON {
       version = 3;
@@ -109,25 +97,6 @@ let
       title = cfg.uploadTitle;
       description = cfg.uploadDescription;
       tags = cfg.uploadTags;
-      danmaku = {
-        room_ids = cfg.danmaku.roomIds;
-        settings = {
-          scroll_time = cfg.danmaku.scrollTime;
-          density = cfg.danmaku.density;
-          font_size = cfg.danmaku.fontSize;
-          font_name = cfg.danmaku.fontName;
-          opacity = cfg.danmaku.opacity;
-          outline = cfg.danmaku.outline;
-          shadow = cfg.danmaku.shadow;
-          show_usernames = cfg.danmaku.showUsernames;
-          show_message_boxes = cfg.danmaku.showMessageBoxes;
-          crf = cfg.danmaku.crf;
-          max_rate_kbit = cfg.danmaku.maxRateKbit;
-          buffer_size_kbit = cfg.danmaku.bufferSizeKbit;
-          preset = cfg.danmaku.preset;
-          threads = cfg.danmaku.threads;
-        };
-      };
       collection =
         if cfg.collection.roomIds == [ ] then
           null
@@ -237,9 +206,6 @@ in
     recordingCredentials
     uploadCredentials
     biliup
-    danmakuFactory
-    danmakuFonts
-    fontconfigFile
     recorderConfig
     uploadMetadata
     prepareConfig

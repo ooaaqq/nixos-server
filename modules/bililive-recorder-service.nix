@@ -23,34 +23,6 @@ in
         message = "ssvgg.bililiveRecorder.uploadTags must be non-empty and contain no commas";
       }
       {
-        assertion =
-          lib.length cfg.danmaku.roomIds == lib.length (lib.unique cfg.danmaku.roomIds)
-          && lib.all (roomId: lib.elem roomId cfg.roomIds) cfg.danmaku.roomIds;
-        message = "ssvgg.bililiveRecorder.danmaku.roomIds must be unique configured recorder rooms";
-      }
-      {
-        assertion = cfg.danmaku.roomIds == [ ] || cfg.upload;
-        message = "ssvgg.bililiveRecorder.danmaku.roomIds requires upload = true";
-      }
-      {
-        assertion =
-          lib.length cfg.collection.roomIds == lib.length (lib.unique cfg.collection.roomIds)
-          && lib.all (roomId: lib.elem roomId cfg.danmaku.roomIds) cfg.collection.roomIds;
-        message = "ssvgg.bililiveRecorder.collection.roomIds must be unique rooms with danmaku uploads enabled";
-      }
-      {
-        assertion = cfg.collection.roomIds == [ ] || cfg.upload;
-        message = "ssvgg.bililiveRecorder.collection.roomIds requires upload = true";
-      }
-      {
-        assertion = cfg.danmaku.outline >= 0.0 && cfg.danmaku.outline <= 4.0;
-        message = "ssvgg.bililiveRecorder.danmaku.outline must be between 0 and 4";
-      }
-      {
-        assertion = cfg.danmaku.bufferSizeKbit >= cfg.danmaku.maxRateKbit;
-        message = "ssvgg.bililiveRecorder.danmaku.bufferSizeKbit must be at least maxRateKbit";
-      }
-      {
         assertion = !cfg.upload || cfg.uploadCredentialFile != null;
         message = "ssvgg.bililiveRecorder.uploadCredentialFile is required when upload = true";
       }

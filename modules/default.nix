@@ -9,7 +9,7 @@
     ./ss2022.nix
     ./sub2api.nix
     ./web.nix
-    ./qq-bot.nix
-    ./llonebot.nix
+    ./nonebot.nix
+    ./llbot.nix
   ];
 }
