@@ -66,3 +66,10 @@ nix build --accept-flake-config .#checks.x86_64-linux.example
 
 Production inventory and deployment automation intentionally belong in a
 separate private repository.
+
+The `nonebot` module owns the Playwright browser runtime used by
+`nonebot-plugin-htmlrender` (and therefore parser-lite). It supplies the
+browser through `PLAYWRIGHT_BROWSERS_PATH`; services do not download browser
+files at startup. The `playwright-browsers` package is an internal module
+implementation detail rather than an application dependency to install by
+itself.

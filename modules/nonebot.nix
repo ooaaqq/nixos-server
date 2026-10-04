@@ -7,7 +7,7 @@
 let
   cfg = config.ssvgg.nonebot;
   hasMain = cfg.mainProject != null;
-  playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers-1.63.nix { };
+  playwrightBrowsers = pkgs.callPackage ../packages/playwright-browsers.nix { };
   packagedProject =
     project:
     if project == null then
