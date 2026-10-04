@@ -55,12 +55,12 @@
 
       packages.${system} = {
         biliup = pkgs.callPackage ./packages/biliup.nix { };
-        playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
+        playwright-browsers = pkgs.callPackage ./packages/playwright-browsers.nix { };
       };
       checks.${system} = {
         example = example.config.system.build.toplevel;
         biliup = pkgs.callPackage ./packages/biliup.nix { };
-        playwright-browsers-1_63 = pkgs.callPackage ./packages/playwright-browsers-1.63.nix { };
+        playwright-browsers = pkgs.callPackage ./packages/playwright-browsers.nix { };
       };
 
       devShells.${system}.default = pkgs.mkShellNoCC {

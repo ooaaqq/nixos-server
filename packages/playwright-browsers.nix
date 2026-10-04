@@ -39,6 +39,10 @@
   noto-fonts-color-emoji,
 }:
 let
+  # Keep the browser revision paired with the Python Playwright version used
+  # by the consuming NoneBot project.  The module owns this runtime closure;
+  # callers should not download browsers at service startup.
+  playwrightVersion = "1.63.0";
   revision = "1243";
   browserVersion = "153.0.8010.12";
   baseUrl = "https://cdn.playwright.dev/builds/cft/${browserVersion}/linux64";
@@ -142,10 +146,10 @@ let
     '';
   };
 in
-linkFarm "playwright-browsers-1.63.0" {
+(linkFarm "playwright-browsers" {
   "chromium-${revision}" = chromium;
   "chromium_headless_shell-${revision}" = chromiumHeadlessShell;
-}
+})
 // {
-  inherit fontconfigFile;
+  inherit fontconfigFile playwrightVersion;
 }
